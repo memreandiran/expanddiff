@@ -209,10 +209,19 @@ authors for publishing their work:
 * [LPIPS](https://github.com/richzhang/PerceptualSimilarity)
 
 We evaluate against ExpandNet, MaskHDR, LEDiff, DITM and Refusion-HDR by running
-the weights and code their authors released, and on the
-[SI-HDR benchmark](https://www.cl.cam.ac.uk/research/rainbow/projects/sihdr_benchmark/)
-of Hanji et al. Training uses HDR from Poly Haven, the Laval photometric
-sample, HDR-Real and the Fairchild HDR Photographic Survey.
+the weights and code their authors released.
+
+The data this work depends on, with thanks to those who collected and released
+it:
+
+* [SI-HDR](https://www.cl.cam.ac.uk/research/rainbow/projects/sihdr_benchmark/)
+  (Hanji et al.) — the evaluation benchmark, its references and its inputs
+* [Poly Haven](https://polyhaven.com/hdris) — CC0 HDR panoramas
+* [Laval photometric indoor HDR](http://hdrdb.com/) (Bolduc et al.) — the public
+  sample
+* [HDR-Real](https://alex04072000.github.io/SingleHDR/) (Liu et al.)
+* [Fairchild HDR Photographic Survey](http://markfairchild.org/HDR.html)
+* [HDR+](https://hdrplusdata.org/) (Hasinoff et al.) — used by ExpandDiff-D
 
 ## Citation
 
