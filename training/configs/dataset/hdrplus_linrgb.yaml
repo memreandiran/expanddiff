@@ -1,0 +1,4 @@
+defaults:
+- train: hdrplus_linrgb
+- val: hdrplus_linrgb_test
+- _self_

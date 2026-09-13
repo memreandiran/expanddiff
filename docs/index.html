@@ -1,0 +1,156 @@
+<!doctype html>
+<!--
+  ExpandDiff project page.
+
+  FOUR PLACEHOLDER LINKS TO FILL IN — search for PLACEHOLDER below:
+    1. arXiv          -> https://arxiv.org/abs/XXXX.XXXXX
+    2. Paper PDF      -> upload the compiled main paper as  paper.pdf  next to this file
+    3. Supplementary  -> upload the compiled supplement as  supplementary.pdf  next to this file
+    4. Code           -> the GitHub repository URL
+
+  Each button carries class="btn disabled". Once a link is real, replace the href
+  and delete the word "disabled" from its class so the button becomes active.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExpandDiff</title>
+<meta name="description" content="ExpandDiff: Dynamic Range Expanding Diffusion for Single-Image HDR Reconstruction.">
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f6f7f9; --fg:#15181d; --muted:#5d6672;
+    --rule:#e2e5ea; --accent:#1b3f8b; --btn-fg:#ffffff; --btn-bg:#222831;
+    --btn-off-bg:#e7e9ed; --btn-off-fg:#8a93a0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14161a; --panel:#1c1f25; --fg:#e9ecf1; --muted:#a3acba;
+      --rule:#2b3038; --accent:#9db8f0; --btn-fg:#14161a; --btn-bg:#d7dce4;
+      --btn-off-bg:#272c34; --btn-off-fg:#6f7783;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14161a; --panel:#1c1f25; --fg:#e9ecf1; --muted:#a3acba;
+    --rule:#2b3038; --accent:#9db8f0; --btn-fg:#14161a; --btn-bg:#d7dce4;
+    --btn-off-bg:#272c34; --btn-off-fg:#6f7783;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:"Charter","Bitstream Charter","Source Serif 4",Georgia,"Times New Roman",serif;
+    font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:900px; margin:0 auto; padding-inline:20px; padding-block:0}
+  header{padding-block:56px 28px; text-align:center; border-bottom:1px solid var(--rule)}
+  h1{
+    font-size:clamp(1.75rem,4.2vw,2.6rem); line-height:1.22; margin:0 0 6px;
+    letter-spacing:-0.01em; font-weight:700;
+  }
+  .subtitle{font-size:clamp(1rem,2.2vw,1.2rem); color:var(--muted); margin:0 0 26px}
+  .authors{font-size:1.02rem; margin:0 0 6px}
+  .authors a{color:inherit; text-decoration:none; border-bottom:1px solid var(--rule)}
+  .affil{color:var(--muted); font-size:0.95rem; margin:0}
+  .venue{color:var(--muted); font-size:0.92rem; margin:14px 0 0; font-style:italic}
+  .links{display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:26px}
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:9px 18px; border-radius:999px; text-decoration:none;
+    background:var(--btn-bg); color:var(--btn-fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:0.94rem; font-weight:600; border:1px solid transparent;
+  }
+  .btn:hover{opacity:.86}
+  .btn.disabled{
+    background:var(--btn-off-bg); color:var(--btn-off-fg);
+    border-color:var(--rule); cursor:default; pointer-events:none;
+  }
+  .btn.disabled::after{content:"soon"; font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; opacity:.8}
+  section{padding-block:38px; border-bottom:1px solid var(--rule)}
+  section:last-of-type{border-bottom:0}
+  h2{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:0.86rem; font-weight:700; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 16px;
+  }
+  p{margin:0 0 16px}
+  p:last-child{margin-bottom:0}
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .grid figure{margin:0}
+  .grid img{width:100%; display:block; border-radius:6px; background:var(--panel)}
+  .grid figcaption{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:.82rem; color:var(--muted); text-align:center; margin-top:6px;
+  }
+  .rowlabel{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:.82rem; font-weight:600; color:var(--muted);
+    margin:22px 0 8px; letter-spacing:.02em;
+  }
+  .rowlabel:first-of-type{margin-top:0}
+  .caption{font-size:.92rem; color:var(--muted); margin-top:18px}
+  footer{padding-block:30px 50px; color:var(--muted); font-size:.88rem; text-align:center}
+  @media (max-width:620px){
+    body{font-size:16px}
+    .grid{grid-template-columns:1fr; gap:14px}
+    header{padding-block:38px 22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ExpandDiff</h1>
+  <p class="subtitle">Dynamic Range Expanding Diffusion for Single-Image HDR Reconstruction</p>
+
+  <p class="authors">
+    Mehmet Emre And&#305;ran &middot; Zhuoqian Yang &middot; Liying Lu &middot; Mathieu Salzmann &middot; Sabine S&uuml;sstrunk
+  </p>
+  <p class="affil">&Eacute;cole Polytechnique F&eacute;d&eacute;rale de Lausanne (EPFL), Switzerland</p>
+  <p class="venue">Preprint &mdash; under review</p>
+
+  <nav class="links">
+    <!-- PLACEHOLDER 1: arXiv -->
+    <a class="btn disabled" href="#" rel="noopener">arXiv</a>
+    <!-- PLACEHOLDER 2: main paper PDF -->
+    <a class="btn disabled" href="#" rel="noopener">Paper</a>
+    <!-- PLACEHOLDER 3: supplementary PDF -->
+    <a class="btn disabled" href="#" rel="noopener">Supplementary</a>
+    <!-- PLACEHOLDER 4: code repository -->
+    <a class="btn disabled" href="#" rel="noopener">Code</a>
+  </nav>
+</header>
+
+<section>
+  <h2>Abstract</h2>
+  <p>Single-image HDR reconstruction requires inferring missing detail while preserving the visible content of an LDR image. We present ExpandDiff, a conditional diffusion pipeline that jointly reconstructs clipped shadows and highlights. The pipeline couples training inputs synthesized by randomly sampling clipping percentiles with a pixel-space diffusion model guided by spatially-adaptive normalization. It predicts perceptually encoded HDR through a bounded output head, reconstructing both clipping directions in one sampling trajectory. On the SI-HDR benchmark, ExpandDiff improves HDR reconstruction accuracy by 3.43&nbsp;dB in PU21-PSNR over the strongest evaluated baseline.</p>
+</section>
+
+<section>
+  <h2>Results</h2>
+
+  <p class="rowlabel">Highlight-only clipping (benchmark inputs)</p>
+  <div class="grid">
+    <figure><img src="assets/c95_input.png" alt="Clipped LDR input, highlight-only condition" loading="lazy"><figcaption>clipped input</figcaption></figure>
+    <figure><img src="assets/c95_ours.png" alt="ExpandDiff reconstruction, highlight-only condition" loading="lazy"><figcaption>ExpandDiff</figcaption></figure>
+    <figure><img src="assets/c95_reference.png" alt="HDR reference, highlight-only condition" loading="lazy"><figcaption>reference</figcaption></figure>
+  </div>
+
+  <p class="rowlabel">Clipping at both ends</p>
+  <div class="grid">
+    <figure><img src="assets/cp_input.png" alt="Clipped LDR input, two-sided condition" loading="lazy"><figcaption>clipped input</figcaption></figure>
+    <figure><img src="assets/cp_ours.png" alt="ExpandDiff reconstruction, two-sided condition" loading="lazy"><figcaption>ExpandDiff</figcaption></figure>
+    <figure><img src="assets/cp_reference.png" alt="HDR reference, two-sided condition" loading="lazy"><figcaption>reference</figcaption></figure>
+  </div>
+
+  <p class="caption">Reconstructions from the SI-HDR references, shown after the per-image brightness alignment used throughout our evaluation. A real photograph is clipped at both ends, so we report the two-sided condition alongside the benchmark's own highlight-only inputs.</p>
+</section>
+
+<footer>
+  Image and Visual Representation Lab (IVRL), EPFL
+</footer>
+
+</div>
+</body>
+</html>

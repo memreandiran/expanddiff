@@ -1,0 +1,19 @@
+defaults:
+  - rawdiffusion
+  - _self_
+
+dataset:
+  val:
+    batch_size: 1
+
+
+checkpoint_name: "last.ckpt"
+# Load this checkpoint file directly instead of resolving one from the
+# experiment directory the training config would name. Set it to use a
+# released checkpoint; leave null to keep the previous behaviour.
+checkpoint_path: null
+save_pred: false
+save_tar: false
+save_visualization_interval: 500
+save_timesteps: false
+save_as_hdf5: true

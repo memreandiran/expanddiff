@@ -1,0 +1,22 @@
+ExpandDiff
+Copyright 2026 Image and Visual Representation Lab (IVRL), EPFL
+
+This product includes software developed as part of RAW-Diffusion
+(Reinders et al.), released under the Apache License, Version 2.0:
+https://github.com/SonyResearch/RAW-Diffusion
+
+Modifications made in this work, relative to that code base:
+
+  * the prediction target is changed from RAW Bayer data to HDR RGB radiance,
+    optionally reparameterised through the PU21 perceptually uniform encoding;
+  * the dataset pipeline is replaced with scene-referred HDR sources and a
+    percentile-clipping degradation that synthesises the LDR guidance;
+  * the evaluation stack is replaced with the HDR metrics reported in the paper
+    (PU21-PSNR, PU21-VSI, PU21-PIQE, HDR-VDP-3 and FID-R) together with the
+    brightness alignment and the camera-response correction they are computed
+    after.
+
+The guidance encoder follows EDSR (Lim et al.). The spatially-adaptive
+normalisation follows SPADE (Park et al.). The PU21 encoding is by Mantiuk and
+Azimi; our implementation is checked against the reference release at
+https://github.com/gfxdisp/pu21 .

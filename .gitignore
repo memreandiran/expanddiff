@@ -1,0 +1,16 @@
+# Checkpoints are released as GitHub release assets, not tracked here.
+checkpoints/*.ckpt
+
+# Preprocessed data, experiment outputs and logs.
+data/
+experiments/
+*.log
+
+__pycache__/
+*.pyc
+.DS_Store
+
+# Hydra and Aim write these next to wherever a command is run.
+outputs/
+.aim/
+multirun/

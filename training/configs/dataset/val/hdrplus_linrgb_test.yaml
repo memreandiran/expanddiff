@@ -1,0 +1,7 @@
+defaults:
+- base
+- _self_
+
+data_dir: data/hdrplus_linrgb
+file_list: HDRPlus_test.txt
+batch_size: 1
