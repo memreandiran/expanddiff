@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SI-HDR (Hanji & Mantiuk, SIGGRAPH 2022) -> a 512x512 evaluation split.
+"""SI-HDR (Hanji et al., SIGGRAPH 2022) -> a 512x512 evaluation split.
 
 This is the split the paper evaluates on. Download SI-HDR from its authors,
 then:

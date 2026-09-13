@@ -211,7 +211,7 @@ authors for publishing their work:
 We evaluate against ExpandNet, MaskHDR, LEDiff, DITM and Refusion-HDR by running
 the weights and code their authors released, and on the
 [SI-HDR benchmark](https://www.cl.cam.ac.uk/research/rainbow/projects/sihdr_benchmark/)
-of Hanji and Mantiuk. Training uses HDR from Poly Haven, the Laval photometric
+of Hanji et al. Training uses HDR from Poly Haven, the Laval photometric
 sample, HDR-Real and the Fairchild HDR Photographic Survey.
 
 ## Citation
