@@ -178,7 +178,11 @@ runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
 
 ## Licence
 
-Apache 2.0; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). The backbone is
+**Code:** Apache 2.0; see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+**Checkpoints:** CC BY-NC 4.0, non-commercial use only; see
+[`checkpoints/LICENSE-WEIGHTS.md`](checkpoints/LICENSE-WEIGHTS.md).
+
+The backbone is
 adapted from RAW-Diffusion (Reinders et al.), the guidance encoder follows EDSR
 (Lim et al.), the conditioning follows SPADE (Park et al.), and PU21 is Mantiuk
 and Azimi's.

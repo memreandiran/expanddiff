@@ -4,6 +4,9 @@
 #   bash checkpoints/download.sh            # all six
 #   bash checkpoints/download.sh p b        # just ExpandDiff-P and -B
 #
+# The checkpoints are licensed CC BY-NC 4.0 (non-commercial use only); see
+# LICENSE-WEIGHTS.md. The code in this repository is Apache 2.0.
+#
 # Override REPO or TAG to pull from a fork or an older release.
 
 set -eu

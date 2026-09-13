@@ -1,5 +1,9 @@
 # Checkpoints
 
+⚠ These weights are licensed **CC BY-NC 4.0** — non-commercial use only.
+See [`LICENSE-WEIGHTS.md`](LICENSE-WEIGHTS.md). The code in this repository
+is Apache 2.0 and carries no such restriction.
+
 Six checkpoints, one per arm reported in the paper and the supplementary
 material. Each is ~96 MB and holds the model weights, the run's full Hydra
 config and its step count. Optimizer state has been removed, so these are for
