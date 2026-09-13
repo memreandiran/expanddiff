@@ -187,6 +187,33 @@ adapted from RAW-Diffusion (Reinders et al.), the guidance encoder follows EDSR
 (Lim et al.), the conditioning follows SPADE (Park et al.), and PU21 is Mantiuk
 and Azimi's.
 
+## Acknowledgement
+
+This project builds on code from the following repositories. We thank the
+authors for publishing their work:
+
+* [RAW-Diffusion](https://github.com/SonyResearch/RAW-Diffusion) — the
+  conditional diffusion backbone we adapt
+* [EDSR-PyTorch](https://github.com/sanghyun-son/EDSR-PyTorch) — the guidance
+  encoder
+* [SPADE](https://github.com/NVlabs/SPADE) — the spatially-adaptive
+  normalisation used for conditioning
+* [pu21](https://github.com/gfxdisp/pu21) — the PU21 encoding, the reference
+  20-parameter correction, and VSI (Zhang et al.)
+* [HDR-VDP-3](https://hdrvdp.sourceforge.net) — the perceptual quality metric
+* [torch-fidelity](https://github.com/toshas/torch-fidelity) — FID and its
+  canonical Inception weights
+* [piq](https://github.com/photosynthesis-team/piq) and
+  [IQA-PyTorch](https://github.com/chaofengc/IQA-PyTorch) — SSIM/MS-SSIM and
+  PIQE
+* [LPIPS](https://github.com/richzhang/PerceptualSimilarity)
+
+We evaluate against ExpandNet, MaskHDR, LEDiff, DITM and Refusion-HDR by running
+the weights and code their authors released, and on the
+[SI-HDR benchmark](https://www.cl.cam.ac.uk/research/rainbow/projects/sihdr_benchmark/)
+of Hanji and Mantiuk. Training uses HDR from Poly Haven, the Laval photometric
+sample, HDR-Real and the Fairchild HDR Photographic Survey.
+
 ## Citation
 
 *BibTeX to follow.*
