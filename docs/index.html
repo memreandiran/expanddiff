@@ -2,11 +2,10 @@
 <!--
   ExpandDiff project page.
 
-  FOUR PLACEHOLDER LINKS TO FILL IN — search for PLACEHOLDER below:
+  TWO PLACEHOLDER LINKS TO FILL IN — search for PLACEHOLDER below:
     1. arXiv          -> https://arxiv.org/abs/XXXX.XXXXX
-    2. Supplementary  -> upload the compiled supplement as  supplementary.pdf  next to this file
     3. Paper PDF      -> upload the compiled main paper as  paper.pdf  next to this file
-    (the Code and Checkpoints buttons are live)
+    (the Supplementary, Code and Checkpoints buttons are live)
 
   Each button carries class="btn disabled". Once a link is real, replace the href
   and delete the word "disabled" from its class so the button becomes active.
@@ -118,8 +117,7 @@
   <nav class="links">
     <!-- PLACEHOLDER 1: arXiv -->
     <a class="btn disabled" href="#" rel="noopener">arXiv</a>
-    <!-- PLACEHOLDER 2: supplementary PDF -->
-    <a class="btn disabled" href="#" rel="noopener">Supplementary</a>
+    <a class="btn" href="supplementary.pdf" rel="noopener">Supplementary</a>
     <!-- PLACEHOLDER 3: main paper PDF -->
     <a class="btn disabled" href="#" rel="noopener">Paper</a>
     <a class="btn" href="https://github.com/memreandiran/expanddiff" rel="noopener">Code</a>
@@ -129,7 +127,7 @@
 
 <section>
   <h2>Abstract</h2>
-  <p>Single-image HDR reconstruction requires inferring missing detail while preserving the visible content of an LDR image. We present ExpandDiff, a conditional diffusion pipeline that jointly reconstructs clipped shadows and highlights. The pipeline couples training inputs synthesized by randomly sampling clipping percentiles with a pixel-space diffusion model guided by spatially-adaptive normalization. It predicts perceptually encoded HDR through a bounded output head, reconstructing both clipping directions in one sampling trajectory. On the SI-HDR benchmark, ExpandDiff improves HDR reconstruction accuracy by 3.43&nbsp;dB in PU21-PSNR over the strongest evaluated baseline.</p>
+  <p>Single-image HDR reconstruction requires inferring missing detail while preserving the visible content of an LDR image. Differences in sensor dynamic range and exposure cause LDR images to lose varying amounts of information in shadows and highlights. We present ExpandDiff, a conditional diffusion pipeline that jointly reconstructs clipped shadows and highlights. To account for this variation, we introduce Dynamic Clipping Synthesis (DCS), which randomly samples shadow and highlight clipping percentiles when constructing training inputs from HDR targets. A pixel-space diffusion model guided by spatially-adaptive normalization then predicts perceptually encoded HDR through a bounded output head, reconstructing both clipping directions in one sampling trajectory. On the SI-HDR benchmark, ExpandDiff variants improve HDR reconstruction accuracy by 3.43&nbsp;dB in PU21-PSNR over the strongest evaluated competing method, and by 7.34&nbsp;dB under two-sided clipping.</p>
 </section>
 
 <section>
@@ -141,12 +139,22 @@
     <figure><img src="assets/c95_ours.png" alt="ExpandDiff reconstruction, highlight-only condition" loading="lazy"><figcaption>ExpandDiff</figcaption></figure>
     <figure><img src="assets/c95_reference.png" alt="HDR reference, highlight-only condition" loading="lazy"><figcaption>reference</figcaption></figure>
   </div>
+  <div class="grid" style="margin-top:10px">
+    <figure><img src="assets/c95_2_input.png" alt="Clipped LDR input, highlight-only condition, second example" loading="lazy"><figcaption>clipped input</figcaption></figure>
+    <figure><img src="assets/c95_2_ours.png" alt="ExpandDiff reconstruction, highlight-only condition, second example" loading="lazy"><figcaption>ExpandDiff</figcaption></figure>
+    <figure><img src="assets/c95_2_reference.png" alt="HDR reference, highlight-only condition, second example" loading="lazy"><figcaption>reference</figcaption></figure>
+  </div>
 
   <p class="rowlabel">Clipping at both ends</p>
   <div class="grid">
     <figure><img src="assets/cp_input.png" alt="Clipped LDR input, two-sided condition" loading="lazy"><figcaption>clipped input</figcaption></figure>
     <figure><img src="assets/cp_ours.png" alt="ExpandDiff reconstruction, two-sided condition" loading="lazy"><figcaption>ExpandDiff</figcaption></figure>
     <figure><img src="assets/cp_reference.png" alt="HDR reference, two-sided condition" loading="lazy"><figcaption>reference</figcaption></figure>
+  </div>
+  <div class="grid" style="margin-top:10px">
+    <figure><img src="assets/cp_2_input.png" alt="Clipped LDR input, two-sided condition, second example" loading="lazy"><figcaption>clipped input</figcaption></figure>
+    <figure><img src="assets/cp_2_ours.png" alt="ExpandDiff reconstruction, two-sided condition, second example" loading="lazy"><figcaption>ExpandDiff</figcaption></figure>
+    <figure><img src="assets/cp_2_reference.png" alt="HDR reference, two-sided condition, second example" loading="lazy"><figcaption>reference</figcaption></figure>
   </div>
 
   <p class="caption">Reconstructions from the SI-HDR references, shown after the per-image brightness alignment used throughout our evaluation. A real photograph is clipped at both ends, so we report the two-sided condition alongside the benchmark's own highlight-only inputs.</p>
