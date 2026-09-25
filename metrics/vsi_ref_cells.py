@@ -77,6 +77,8 @@ def main():
     ap.add_argument("--file_list", default="SIHDR_test.txt")
     ap.add_argument("--out_dir", default="fid_logs/vsi_ref")
     ap.add_argument("--l_peak", type=float, default=1000.0)
+    ap.add_argument("--pred_root", default=None,
+                    help="directory holding <arm>/pred (default: --split_dir)")
     a = ap.parse_args()
 
     if not os.path.isfile(os.path.join(PU21_M, "m_vsi.m")):
@@ -86,6 +88,7 @@ def main():
     pairs = read_pairs(a.split_dir, a.file_list)
     os.makedirs(a.out_dir, exist_ok=True)
     tag = "vsiref"
+    failed = []
 
     for arm in a.arms.split(","):
         arm = arm.strip()
@@ -93,7 +96,7 @@ def main():
         if os.path.exists(out):
             print(f"  have {out}")
             continue
-        pdir = os.path.join(a.split_dir, arm, "pred")
+        pdir = os.path.join(a.pred_root or a.split_dir, arm, "pred")
         tmp = tempfile.mkdtemp()
         n = miss = 0
         for t_rel, _g in pairs:
@@ -116,7 +119,8 @@ def main():
             savemat(os.path.join(tmp, f"{name}.mat"), {"P": P, "T": T}, format="5")
             n += 1
         if n == 0:
-            print(f"  !! no images for {arm}")
+            print(f"  !! no images for {arm} under {pdir}")
+            failed.append(arm)
             continue
         csv = os.path.join(tmp, "out.csv")
         mfile = os.path.join(tmp, "run.m")
@@ -127,6 +131,7 @@ def main():
         r = subprocess.run([OCT, mfile], env=env, capture_output=True, text=True)
         if not os.path.exists(csv):
             print(f"  !! octave produced nothing for {arm}\n{r.stderr[-600:]}")
+            failed.append(arm)
             continue
         vals = [float(l.split(",")[1]) for l in open(csv).read().splitlines()[1:] if l.strip()]
         res = {"arm": arm, "condition": a.condition, "backend": "reference-m_vsi.m-octave",
@@ -135,6 +140,8 @@ def main():
         with open(out, "w") as fh:
             yaml.dump(res, fh, sort_keys=True, default_flow_style=False)
         print(f"  {arm}: pu21_vsi {res['pu21_vsi']:.6f} (n={len(vals)}) -> {out}")
+    if failed:
+        sys.exit(f"FAILED: no score for {', '.join(failed)}")
 
 
 if __name__ == "__main__":

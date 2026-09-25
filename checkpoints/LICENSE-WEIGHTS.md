@@ -1,6 +1,6 @@
 # Licence for the released checkpoints
 
-The six ExpandDiff checkpoints distributed as release assets — every file listed
+The seven ExpandDiff checkpoints distributed as release assets — every file listed
 in [`MANIFEST.md`](MANIFEST.md) — are licensed under
 **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**.
 

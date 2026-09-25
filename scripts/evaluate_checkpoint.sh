@@ -98,10 +98,10 @@ echo
 echo "########## 5. the optional metric families ##########"
 if command -v octave-cli >/dev/null 2>&1 || command -v octave >/dev/null 2>&1; then
   "$PY" metrics/vsi_ref_cells.py --split_dir "$SPLIT" --file_list "$INDEX" \
-      --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" \
+      --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" --pred_root "$OUT" \
       --out_dir "$OUT/yaml/vsi" || { echo "FAILED: PU21-VSI"; FAIL=$((FAIL+1)); }
   "$PY" metrics/crf_ref2_cells.py --split_dir "$SPLIT" --file_list "$INDEX" \
-      --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" \
+      --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" --pred_root "$OUT" \
       --out_dir "$OUT/yaml/crf" || { echo "FAILED: corrected columns"; FAIL=$((FAIL+1)); }
 else
   echo "SKIP PU21-VSI and the corrected columns: Octave not on PATH"
@@ -122,7 +122,7 @@ fi
   || { echo "FAILED: FID-R"; FAIL=$((FAIL+1)); }
 
 "$PY" metrics/piqe_ref_cells.py --split_dir "$SPLIT" --file_list "$INDEX" \
-    --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" \
+    --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" --pred_root "$OUT" \
     --out_dir "$OUT/yaml/piqe" || { echo "SKIP or FAILED: PU21-PIQE (needs pyiqa)"; }
 
 echo

@@ -45,7 +45,7 @@ PCT_LOW=${PCT_LOW:-0 10}
 # N independently-sampled clips per target. 1 gave 13,270 pairs, which is 360
 # epochs at batch 32 for 150k steps -- 3x what scenehdr_512 saw, and an
 # overfitting risk. 3 restores the pair count.
-CLIP_REPEATS=${CLIP_REPEATS:-1}
+CLIP_REPEATS=${CLIP_REPEATS:-3}
 # Capture model applied AFTER the percentile clip. "none" (default) keeps every
 # existing split bit-exact; "lediff" adds the randomised CRF + 8-bit round trip,
 # a rough stand-in for SI-HDR Eq. 1 (85 DoRF curves + noise + quantisation).

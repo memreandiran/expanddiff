@@ -65,9 +65,9 @@ def read_pairs(split_dir, file_list):
     return [tuple(l.strip().split(",")) for l in open(os.path.join(split_dir, file_list)) if l.strip()]
 
 
-def corrected_pairs(split_dir, arm, file_list):
+def corrected_pairs(split_dir, arm, file_list, pred_root=None):
     """Yield (name, corrected_pred_over_peak, target_over_peak)."""
-    pdir = os.path.join(split_dir, arm, "pred")
+    pdir = os.path.join(pred_root or split_dir, arm, "pred")
     for t_rel, _g in read_pairs(split_dir, file_list):
         name = os.path.splitext(os.path.basename(t_rel))[0]
         pp = os.path.join(pdir, name + "_generated_linear.tiff")
@@ -83,10 +83,10 @@ def corrected_pairs(split_dir, arm, file_list):
         yield name, It, gt
 
 
-def score(split_dir, arm, file_list, want_vsi=True):
+def score(split_dir, arm, file_list, want_vsi=True, pred_root=None):
     tmp = tempfile.mkdtemp()
     psnrs, n, miss, over = [], 0, 0, []
-    for name, It, gt in corrected_pairs(split_dir, arm, file_list):
+    for name, It, gt in corrected_pairs(split_dir, arm, file_list, pred_root):
         if It is None:
             miss += 1
             continue
@@ -161,6 +161,8 @@ def main():
     ap.add_argument("--out_dir", default="fid_logs/crf_ref2")
     ap.add_argument("--no_vsi", action="store_true")
     ap.add_argument("--self_check", action="store_true")
+    ap.add_argument("--pred_root", default=None,
+                    help="directory holding <arm>/pred (default: --split_dir)")
     a = ap.parse_args()
 
     if a.self_check:
@@ -171,14 +173,16 @@ def main():
             raise SystemExit(f"[error] --{req} required")
 
     os.makedirs(a.out_dir, exist_ok=True)
+    failed = []
     for arm in [x.strip() for x in a.arms.split(",") if x.strip()]:
         out = os.path.join(a.out_dir, f"crfref2_{a.condition}_{arm}.yaml")
         if os.path.exists(out):
             print(f"  have {out}")
             continue
-        p, v, n, miss, over = score(a.split_dir, arm, a.file_list, not a.no_vsi)
+        p, v, n, miss, over = score(a.split_dir, arm, a.file_list, not a.no_vsi, a.pred_root)
         if not n:
-            print(f"  !! no images for {arm}")
+            print(f"  !! no images for {arm} under {os.path.join(a.pred_root or a.split_dir, arm, 'pred')}")
+            failed.append(arm)
             continue
         res = {"arm": arm, "condition": a.condition, "crf_corrected": True,
                "crf_basis": "reference-port-gfxdisp-pu21",
@@ -189,6 +193,9 @@ def main():
         yaml.dump(res, open(out, "w"), sort_keys=True, default_flow_style=False)
         print(f"  {arm}: PSNR {p:.4f}  VSI {'--' if v is None else f'{v:.6f}'}  "
               f"(n={n}, {over:.2f}% px above anchor) -> {out}")
+    if failed:
+        print(f"FAILED: no score for {', '.join(failed)}")
+        return 1
     return 0
 
 

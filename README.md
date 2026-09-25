@@ -12,7 +12,7 @@ Project page: <https://memreandiran.github.io/expanddiff/>
     metrics/         everything used to produce the reported numbers
     rawdiffusion/    the model, diffusion, datasets and metrics
     scripts/         environment check, one-command evaluation
-    checkpoints/     the six released checkpoints (weights fetched separately)
+    checkpoints/     the seven released checkpoints (weights fetched separately)
 
 ## Install
 
@@ -50,7 +50,7 @@ means 1000 cd/m², and `<name>_generated_srgb.png` to look at. Add
 `--save_guidance` to also write what the model was fed.
 
 `--target_encoding` must match the checkpoint: `pu21` for ExpandDiff-P,
-ExpandDiff-B and the PU21 ablation, `none` for ExpandDiff-D and the two linear
+ExpandDiff-B, ExpandDiff-S and the PU21 ablation, `none` for ExpandDiff-D and the two linear
 ablations. `checkpoints/MANIFEST.md` lists it per file and says which checkpoint
 to use.
 
@@ -96,7 +96,7 @@ and Fairchild (<http://markfairchild.org/HDR.html>) — then train:
         general.suffix=my_run general.check_val_every_n_epoch=10
 
 `general.lr` is not part of the experiment directory name, so always pass it
-explicitly. `checkpoints/MANIFEST.md` gives every setting of all six released
+explicitly. `checkpoints/MANIFEST.md` gives every setting of all seven released
 runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
 `training/sample.py`.
 
@@ -109,12 +109,14 @@ runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
     #    archives unpack one level deeper, as reference/sihdr/reference
     python preprocessing/sihdr_preprocess.py --dataset_root <SI-HDR> \
         --output_dir <test split> --clip_level clip_95
-    #    (or sihdr_pctclip_preprocess.py for the doubly-clipped condition)
+    #    (or sihdr_pctclip_preprocess.py for C_p; add --clip_pct_low 10
+    #    --clip_pct_high 30 for C_p^hard)
 
     # 1. preprocess: HDR sources -> training pairs
     python preprocessing/scenehdr_preprocess.py --dataset_root <hdr dir> [--panorama] \
         --output_dir data/<split> --size 512 512 --degradation percentile \
         --clip_pct_low 0 10 --clip_pct_high 0 30 --clip_repeats 3 [--append]
+    #    (ExpandDiff-S: --degradation lediff --exposures all, without the clip flags)
 
     # 2. train
     python training/train.py general.is_linear=true general.target_encoding=pu21 \
@@ -151,17 +153,18 @@ runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
     python metrics/compute_ref_metrics.py --device cpu --linear \
         --data_dir <test split> --file_list <prefix>.txt \
         --pred_dir <arm>_scale/pred --out gain.yaml
-    python metrics/vsi_ref_cells.py --split_dir <test split> \
+    python metrics/vsi_ref_cells.py --split_dir <test split> --pred_root . \
         --condition <condition> --arms <arm>_scale --out_dir vsi/
-    python metrics/crf_ref2_cells.py --split_dir <test split> \
+    python metrics/crf_ref2_cells.py --split_dir <test split> --pred_root . \
         --condition <condition> --arms <arm>_scale --out_dir crf/
+    #    FID-R: the reported value is the mean over --seed 1234, 7 and 99
     python metrics/compute_fid.py --device cpu \
         --data_dir <test split> --file_list <prefix>.txt \
         --pred_dir <arm>_scale/pred --out fid.yaml
     VDP_ROOT=<hdrvdp-3.0.7> DIAG_IN=24 RES_W=1920 RES_H=1080 DIST_M=1.0 \
         python metrics/hdrvdp3_bridge.py --data_dir <test split> \
         --pred_dir <arm>_scale/pred --file_list <prefix>.txt --out vdp3.yaml
-    python metrics/piqe_ref_cells.py --split_dir <test split> \
+    python metrics/piqe_ref_cells.py --split_dir <test split> --pred_root . \
         --condition <condition> --arms <arm>_scale --out_dir piqe/
 
     # 6. HDR-VDP-3 on the corrected basis: write corrected tiffs, then score them

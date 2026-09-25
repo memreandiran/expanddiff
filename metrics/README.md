@@ -19,7 +19,8 @@ every method is calibrated the same way before scoring:
 
 `--out_dir` must be the `pred` directory itself. The gain is fitted per image
 over pixels the input did not clip. Other modes: `gamma_scale` (two parameters),
-`guidance_scale` (fitted against the input, no ground truth), `none`.
+`guidance_scale` (fitted against the input, no ground truth), `none`. For LEDiff,
+add `--blend --blend_preset supp`, the post-process its paper describes.
 
 ⚠ Scores written by `training/sample.py` itself come before this step and are several dB
 lower. Start from its tiffs, not its yaml.
@@ -40,7 +41,9 @@ lower. Start from its tiffs, not its yaml.
 | `piqe_ref_cells.py` | PU21-PIQE | `pu21_piqe_ref` |
 
 The cell scripts take `--split_dir`, `--condition`, `--arms <arm>_scale` and
-`--out_dir`, and expect the predictions at `<split_dir>/<arm>_scale/pred`.
+`--out_dir`, and read the predictions from `<pred_root>/<arm>_scale/pred`, where
+`--pred_root` defaults to `--split_dir`. The reported FID-R is the mean over
+`--seed 1234`, `7` and `99`.
 
 Higher is better for PU21-PSNR, PU21-VSI and HDR-VDP-3; lower for PIQE and
 FID-R. Check `n_images` matches your split size, and `feature_extractor` reads

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Fetch the released checkpoints into this directory and verify their hashes.
 #
-#   bash checkpoints/download.sh            # all six
+#   bash checkpoints/download.sh            # all seven
 #   bash checkpoints/download.sh p b        # just ExpandDiff-P and -B
 #
 # The checkpoints are licensed CC BY-NC 4.0 (non-commercial use only); see
@@ -18,6 +18,7 @@ BASE=https://github.com/$REPO/releases/download/$TAG
 declare -A FILES=(
   [p]=expanddiff_p_150k.ckpt
   [b]=expanddiff_b_75k.ckpt
+  [s]=expanddiff_s_150k.ckpt
   [d]=expanddiff_d_150k.ckpt
   [pu21_unbounded]=ablation_pu21_unbounded_150k.ckpt
   [linear_target]=ablation_linear_target_150k.ckpt

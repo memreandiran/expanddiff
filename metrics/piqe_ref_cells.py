@@ -73,7 +73,10 @@ def main():
     ap.add_argument("--file_list", default="SIHDR_test.txt")
     ap.add_argument("--out_dir", default="fid_logs/piqe_ref")
     ap.add_argument("--check", default="", help="arm=expected, aborts unless it reproduces")
+    ap.add_argument("--pred_root", default=None,
+                    help="directory holding <arm>/pred (default: --split_dir)")
     a = ap.parse_args()
+    root = a.pred_root or a.split_dir
 
     try:
         import pyiqa
@@ -87,23 +90,30 @@ def main():
 
     if a.check:
         arm, exp = a.check.split("=")
-        v, n = score(metric, os.path.join(a.split_dir, arm, "pred"), ns)
+        v, n = score(metric, os.path.join(root, arm, "pred"), ns)
         print(f"BASIS CHECK {arm}: {v:.4f} (n={n}), expected {float(exp):.4f}")
         if abs(v - float(exp)) > 0.01:
             sys.exit("ABORT: basis check failed; the new cells would not be comparable.")
         print("basis OK")
 
     os.makedirs(a.out_dir, exist_ok=True)
+    failed = []
     for arm in a.arms.split(","):
         out = os.path.join(a.out_dir, f"piqe_{a.condition}_{arm}.yaml")
         if os.path.exists(out):
             print(f"have {out}"); continue
-        v, n = score(metric, os.path.join(a.split_dir, arm, "pred"), ns)
+        v, n = score(metric, os.path.join(root, arm, "pred"), ns)
+        if n == 0:
+            print(f"  !! no images for {arm} under {os.path.join(root, arm, 'pred')}")
+            failed.append(arm)
+            continue
         with open(out, "w") as fh:
             fh.write(f"arm: {arm}\nbackend: pyiqa-piqe\ncondition: {a.condition}\n"
                      f"device: cpu\nn_images: {n}\npu21_l_peak: 1000.0\n"
                      f"pu21_piqe_ref: {v}\n")
         print(f"  {arm}: {v:.4f} (n={n}) -> {out}")
+    if failed:
+        sys.exit(f"FAILED: no score for {', '.join(failed)}")
 
 
 if __name__ == "__main__":
