@@ -13,14 +13,13 @@ preprocessed split, and writes them as yaml.
 double-warp sRGB input.
 --device defaults to cuda; pass cpu explicitly on a machine without a GPU.
 
-`pu21_psnr_ref` is the value the paper tables. For the corrected (+CRF) columns
-use metrics/crf_ref2_cells.py; for PU21-VSI on the published basis use
-metrics/vsi_ref_cells.py.
+`pu21_psnr_ref` is PU21-PSNR on the gfxdisp/pu21 reference convention. For
+CRF-corrected PU21-PSNR and PU21-VSI use metrics/crf_ref2_cells.py; for PU21-VSI
+from the reference m_vsi.m use metrics/vsi_ref_cells.py.
 
 Relative paths are resolved against $EXPANDIFF_ROOT; absolute paths bypass that.
 """
-# Make the repository root importable no matter where this is run from:
-# Python puts the SCRIPT's directory on sys.path, not the working directory.
+# Make the repository root importable no matter where this is run from.
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))

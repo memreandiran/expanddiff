@@ -7,11 +7,10 @@ class LPIPSMetric(BaseMetric):
     """Learned Perceptual Image Patch Similarity (Zhang et al. 2018).
 
     Inputs are expected in [0, 1] (matching the rest of the metrics in this
-    package). The LPIPS backbone (AlexNet/VGG) was trained on sRGB-encoded
-    natural images, so when the rest of the pipeline operates in *linear*
-    RGB, this metric internally applies the sRGB EOTF-inverse before calling
-    the LPIPS network. Disable via `input_is_linear=False` if your inputs
-    are already sRGB-encoded. Lower is better.
+    package). With `input_is_linear=True` (default) the metric applies the
+    sRGB EOTF-inverse before calling the LPIPS network. Pass
+    `input_is_linear=False` if your inputs are already sRGB-encoded. Lower is
+    better.
     """
 
     def __init__(self, net="alex", input_is_linear=True, *args, **kwargs) -> None:

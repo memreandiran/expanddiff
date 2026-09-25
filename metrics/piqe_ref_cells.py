@@ -2,20 +2,18 @@
 """PU21-PIQE, no-reference, through the pyiqa implementation, on CPU.
 
   python metrics/piqe_ref_cells.py --split_dir <split> --condition <name> \
-      --arms <arm>[,<arm>...] [--out_dir fid_logs/piqe_ref] \
+      --arms <arm>[,<arm>...] [--out_dir <dir>] \
       [--check <arm>=<value>]
 
 Writes one yaml per arm, recording the backend and the device beside the score.
 
-pyiqa must be importable; the script aborts rather than falling back to another
-implementation, because PIQE values do not transfer between implementations.
+pyiqa must be importable; the script aborts otherwise. PIQE values from other
+implementations are not comparable.
 
-CPU only, deliberately: PIQE thresholds 16x16 blocks into active and inactive,
-so reduction-order differences between devices flip blocks discretely and shift
-the mean. Every cell being compared must be computed the same way.
+Runs on CPU only. Compare only scores computed the same way.
 
---check <arm>=<value> rescores a known cell first and aborts unless it
-reproduces within 0.01.
+--check <arm>=<value> rescores <arm> first and aborts unless it reproduces
+<value> within 0.01.
 """
 import argparse, os, re, sys
 import numpy as np, tifffile, torch

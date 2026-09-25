@@ -10,15 +10,15 @@ Run from the repository root, after building a split with the scripts in
       dataset.train.file_list=SceneHDR_train.txt \
       dataset.train.batch_size=32 general.max_steps=150000 \
       general.lr=2e-4 general.lr_scheduler=cosine general.seed=0 \
-      general.suffix=scenehdr_pct3 general.check_val_every_n_epoch=10
+      general.suffix=<name> general.check_val_every_n_epoch=10
 
 ExpandDiff-B is the same with `data_dir=data/scenehdr_c95_512`,
-`general.max_steps=75000`, `general.lr=1e-4`, `general.suffix=scenehdr_c95`.
+`general.max_steps=75000` and `general.lr=1e-4`.
 The ablations drop `general.target_encoding=pu21` and/or add
-`model.out_tanh=false`. `checkpoints/MANIFEST.md` gives every field of all six
+`model.out_tanh=false`. `checkpoints/MANIFEST.md` gives every field of the
 released runs.
 
-THE SETTINGS THAT MATTER, and two traps in them:
+KEY SETTINGS:
 
   general.target_encoding   `pu21` trains against the PU21-encoded target;
                             `none` against linear radiance. Sampling and
@@ -29,13 +29,11 @@ THE SETTINGS THAT MATTER, and two traps in them:
                             from the data dir, batch size, step budget, loss
                             weights and target encoding. Two runs differing in
                             any of those cannot collide.
-  ⚠ general.lr              is NOT part of that directory name. A run started
-                            without it silently uses the 1e-4 default and
-                            resolves to the same directory as a 2e-4 run with
-                            the same suffix. Always pass it explicitly.
-  ⚠ weight_logl1/pul1       a log-domain or PU-encoded loss term on top of a
-                            PU21 target compresses the shadows twice. Training
-                            refuses that combination rather than running it.
+  general.lr                is not part of that directory name and defaults to
+                            1e-4. Always pass it explicitly: runs that differ
+                            only in lr resolve to the same directory.
+  weight_logl1, weight_pul1 must be 0.0 with target_encoding=pu21; training
+                            refuses to start otherwise.
 
 WHAT IT WRITES, under `experiments/<resolved name>/`:
 
@@ -46,9 +44,7 @@ WHAT IT WRITES, under `experiments/<resolved name>/`:
 Checkpoints are saved every 1000 steps and validation runs every
 `general.check_val_every_n_epoch` epochs.
 """
-# Make the repository root importable no matter where this is run from:
-# Python puts the SCRIPT's directory on sys.path, not the working directory, so
-# `python training/train.py` would otherwise fail to find `rawdiffusion`.
+# Make the repository root importable no matter where this is run from.
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
@@ -102,9 +98,7 @@ class RAWDiffusionModule(LightningModule):
         image_size = self.params.general.image_size
         # Width of the guidance the RGB guidance module actually receives: 3
         # normally, 4 when clip_mask_channel appends the mask. The torchinfo
-        # summary below builds a dummy input from this, so hardcoding 3 made
-        # every clip_mask_channel run die before step 0 with
-        #   weight of size [64, 4, 3, 3], expected input[1, 3, ...]
+        # summary below builds a dummy input from this.
         guidance_channels = self.params.model.rgb_guidance_module.get("n_colors", 3)
 
         if self.params.general.get("clip_mask_channel", False):
@@ -116,10 +110,8 @@ class RAWDiffusionModule(LightningModule):
                     f"{nc}). Pass model/rgb_guidance_module.n_colors=4.")
         self.target_encoding = self.params.general.get("target_encoding", "none")
         if self.target_encoding != "none":
-            # log-L1 and PU-L1 both re-curve the target. Stacking either on top
-            # of a PU21 target compresses the shadows twice and quietly undoes
-            # the reason for encoding in the first place, so refuse it outright
-            # rather than train a run that looks fine and is not.
+            # log-L1 and PU-L1 both re-curve the target, so refuse either on
+            # top of an encoded target.
             bad = [n for n in ("weight_logl1", "weight_pul1")
                    if self.params.general.get(n, 0.0) > 0.0]
             if bad:
@@ -158,8 +150,7 @@ class RAWDiffusionModule(LightningModule):
     def save_vis(self, vis, vis_dir, base):
         """Write a debug strip. The strip interleaves encoded panels (target,
         model output) with linear ones (guidance), so it cannot be decoded as a
-        whole; for PU targets it is saved as-is, which is legible anyway
-        because PU is perceptually uniform by construction."""
+        whole; for PU targets it is saved as-is."""
         if self.target_encoding != "none":
             to_pil_image(vis.clamp(0, 1)).save(
                 os.path.join(vis_dir, base + f"_{self.target_encoding}.png"))
@@ -294,7 +285,7 @@ class RAWDiffusionModule(LightningModule):
             input_data_device = input_data.to(raw_generated.device)
 
             # decode first: val metrics then mean the same thing whether or
-            # not the target is encoded, so curves stay comparable across runs
+            # not the target is encoded
             self.metrics_sampling.update(
                 decode_target(self.normalize_inv(input_data_device),
                               self.target_encoding),
@@ -308,11 +299,10 @@ class RAWDiffusionModule(LightningModule):
                 self.log(f"val_sampling_{k}", v)
 
     def append_clip_mask(self, guidance_data):
-        """LEVEL 3: concatenate the soft clip mask onto the guidance.
+        """Concatenate the soft clip mask onto the guidance.
 
-        Tells the model where the input carries no information, instead of making
-        it infer that. Computed from the guidance only, so the oracle-free claim
-        is unaffected -- a deployed model can derive this from its own input.
+        The mask tells the model where the input carries no information. It is
+        computed from the guidance only.
         """
         from rawdiffusion.gaussian_diffusion import clip_soft_mask
 
@@ -349,9 +339,8 @@ class RAWDiffusionModule(LightningModule):
                 x_start,
                 # RGB only: with clip_mask_channel the guidance carries a 4th
                 # (mask) channel, and this strip concatenates along WIDTH, which
-                # still requires every panel to agree on channels. The mask is a
-                # pure function of the guidance, so dropping it from the strip
-                # loses nothing. A no-op slice in the default 3-channel case.
+                # still requires every panel to agree on channels. A no-op slice
+                # in the default 3-channel case.
                 guidance_data.to(x_start.device)[:, :3],
                 x_t,
                 model_output,
@@ -518,9 +507,8 @@ def main(cfg: DictConfig) -> None:
         print("checkpoint", experiment_folder)
 
     trainer = pl.Trainer(
-        # "auto" resolves to the GPU when one is present, which is what every
-        # reported run used; on a CPU-only machine it lets a short smoke test
-        # run instead of failing in Lightning with "No supported gpu backend".
+        # "auto" uses the GPU when one is present, and lets a short smoke test
+        # run on a CPU-only machine.
         accelerator="auto",
         devices=1,
         max_steps=cfg.general.max_steps,

@@ -1,9 +1,5 @@
 """Exposure-bracket synthesis, numpy only.
 
-Kept free of torch so it can be unit-tested and reused off-cluster (haas001
-has no torch) and shared by the dataset, the fusion stage, and any evaluation
-script that needs to rebuild the same variants.
-
 Given an unclipped linear-RGB patch L in [0, 1] and thresholds t_lo < t_hi:
 
     L0 = (clip(L, t_lo, t_hi) - t_lo) / (t_hi - t_lo)    guidance: both ends clipped
@@ -11,8 +7,7 @@ Given an unclipped linear-RGB patch L in [0, 1] and thresholds t_lo < t_hi:
     L+ =  clip(L, 0.0, t_hi)  / t_hi                     shadows intact
 
 L0 is what the model sees. L- and L+ are the two specialist targets: each keeps
-one end of the range intact so a single decoder only ever has to reconstruct one
-kind of destroyed content.
+one end of the range intact.
 """
 import numpy as np
 
@@ -24,8 +19,7 @@ def draw_stops(shadow_stops, highlight_stops, is_train, rng=None):
 
     Training draws uniformly inside each stop range, matching the per-patch
     randomisation the preprocessors use. Validation/test takes the deterministic
-    midpoint, which is exactly what the preprocessed test splits contain, so
-    results stay comparable to existing checkpoints.
+    midpoint, as in the preprocessed test splits.
     """
     s_lo, s_hi = (float(v) for v in shadow_stops)
     h_lo, h_hi = (float(v) for v in highlight_stops)
@@ -43,25 +37,24 @@ def draw_stops(shadow_stops, highlight_stops, is_train, rng=None):
 def make_bracket(lin, t_lo, t_hi, absolute_scale=True):
     """-> (L0, L_minus, L_plus), each float32 in [0, 1], same shape as `lin`.
 
-    L0 is always the rescaled guidance: it is the model INPUT and must span
-    [0, 1] the way the preprocessed data does.
+    L0 is always the rescaled guidance: it is the model input and spans
+    [0, 1] like the preprocessed data.
 
-    `absolute_scale` controls the two TARGETS:
+    `absolute_scale` controls the two targets:
 
       True (default) -- targets are clip-only, already in L's own units:
           L- = clip(L, t_lo, 1.0)      spans [t_lo, 1]
           L+ = clip(L, 0.0,  t_hi)     spans [0, t_hi]
         Fusion is then a plain convex combination of the two predictions and
-        needs NO stops at inference, so the pipeline stays deployable on
-        arbitrary photos. Between them the pair covers the whole range: every
-        pixel is either above t_lo (where L- == L) or below t_hi (where
-        L+ == L). Caveat: L+ is compressed into [0, t_hi], so its L1/L2
+        needs no stops at inference. Between them the pair covers the whole
+        range: every pixel is either above t_lo (where L- == L) or below t_hi
+        (where L+ == L). L+ is compressed into [0, t_hi], so its L1/L2
         gradients are ~1/t_hi smaller than L-'s.
 
-      False -- each target is additionally rescaled to fill [0, 1]. Trains more
-        comfortably but the variants then live on three different affine axes,
-        so any fusion must first un-normalise them (see unnormalize_* below),
-        which requires knowing t_lo and t_hi at inference.
+      False -- each target is additionally rescaled to fill [0, 1]. The
+        variants then live on three different affine axes, so any fusion must
+        first un-normalise them (see unnormalize_* below), which requires
+        knowing t_lo and t_hi at inference.
     """
     l0 = (np.clip(lin, t_lo, t_hi) - t_lo) / (t_hi - t_lo)
     if absolute_scale:
@@ -75,20 +68,17 @@ def make_bracket(lin, t_lo, t_hi, absolute_scale=True):
 
 
 # --------------------------------------------------------------------------- #
-# Un-normalisation: map each variant back into the TARGET's scale.
+# Un-normalisation: map each variant back into the target's scale.
 #
-# L0, L- and L+ are three DIFFERENT affine rescalings of L, so a convex
-# combination of them cannot reconstruct L. Measured on a real test image with
-# midpoint stops: |L0 - L| = 0.226 mean abs over unclipped pixels, while
-# |unnormalize_L0(L0) - L| = 1.9e-9. Any fusion must therefore operate on
-# un-normalised sources, all of which live in L's scale and are each EXACT over
-# part of the range:
+# L0, L- and L+ are three different affine rescalings of L, so a convex
+# combination of them cannot reconstruct L. Fuse un-normalised sources, which
+# all live in L's scale and are each exact over part of the range:
 #
 #   unnormalize_L0     exact wherever the guidance was not clipped
 #   unnormalize_minus  exact wherever highlights survived (L >= t_lo)
 #   unnormalize_plus   exact wherever shadows survived   (L <= t_hi)
 #
-# unnormalize_L0 is precisely the analytic inverse-rescale baseline.
+# unnormalize_L0 is the analytic inverse-rescale baseline.
 # --------------------------------------------------------------------------- #
 def unnormalize_L0(l0, t_lo, t_hi):
     """Guidance -> target scale. Exact on unclipped pixels, flat at the limits."""
@@ -106,25 +96,14 @@ def unnormalize_plus(l_plus, t_lo=None, t_hi=1.0):
 
 
 # --------------------------------------------------------------------------- #
-# Target encoding, for training on SCENE-REFERRED radiance.
+# Target encoding, for training on scene-referred radiance.
 #
-# HDR+ and FiveK targets are display-referred and already live in [0,1], so the
-# tanh-bounded U-Net can predict them directly. True HDR (SI-HDR, Fairchild) is
-# unbounded scene radiance: normalising it into [0,1] by percentile throws away
-# the top of the range, which is precisely the highlight detail such a dataset
-# exists for.
+# PU21 encoding is bounded in [0,1], perceptually uniform, and monotonic, so
+# the model can predict PU-encoded values with the same tanh head. Decode at
+# inference.
 #
-# PU21 encoding solves this without touching the architecture. It is bounded in
-# [0,1] by construction, perceptually uniform, and monotonic, so the model can
-# predict PU-encoded values with the same tanh head and the full dynamic range
-# survives. Decode at inference. This is the same idea as LEDiff's log-space
-# decoder.
-#
-# It also aligns training with reporting: PU-PSNR is exactly PSNR computed on
-# these values, so the loss now optimises what the headline metric measures.
-#
-# NOTE: clipping must still happen in LINEAR radiance, because clipping is a
-# physical sensor effect. Encode the TARGET only, after the bracket is built.
+# Clipping must happen in linear radiance: encode the target only, after the
+# bracket is built.
 # --------------------------------------------------------------------------- #
 _PU21_P = (0.353487901, 0.3734658629, 8.277049286e-05, 0.9062562627,
            0.09150303166, 0.9099517204, 596.3148142)

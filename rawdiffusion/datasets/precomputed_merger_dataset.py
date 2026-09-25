@@ -1,20 +1,13 @@
 """Dataset over precomputed ddim24 predictions, for merger training.
 
-Reads what precompute_ddim.py wrote: one x_hat per (patch, stop-draw), plus the
-stops used. `L` comes from the split as usual and `L0` is regenerated from the
-stops, so only x_hat had to be stored.
+Reads one precomputed x_hat per (patch, stop-draw), plus the stops used. `L`
+comes from the split as usual and `L0` is regenerated from the stops.
 
-This is the distribution the merger actually faces at deployment, which no
-choice of a single diffusion timestep can reproduce. Training against it removes
-the timestep question entirely and needs no backbone forward per step, so merger
-training becomes minutes rather than hours.
+Rotation and flip augmentation is applied identically to all arrays, so they
+stay pixel-aligned. There is no random crop: the stored patches are already the
+training patch size.
 
-Rotation and flip augmentation is applied identically to all three arrays, so
-they stay pixel-aligned. Random crop is skipped: the stored patches are already
-the training patch size, and cropping would break alignment with x_hat for no
-gain.
-
-Batch keys match what train_merger.py expects, plus `x_hat`:
+Batch keys:
     x_hat, guidance_data, target_data  -- all CHW in [-1, 1]
 """
 import csv
@@ -30,9 +23,9 @@ from .bracket_ops import make_bracket
 class PrecomputedMergerDataset(Dataset):
     def __init__(self, precomputed_dir, data_dir, augment=True,
                  precomputed_dir2=None):
-        """precomputed_dir2 adds a SECOND x_hat per sample, for the
+        """precomputed_dir2 adds a second x_hat per sample, for the
         two-specialist router. Both directories must have been produced with
-        the same --seed, which makes the drawn stops and the keys identical, so
+        the same seed, so that the drawn stops and the keys are identical and
         the two predictions correspond to the same guidance."""
         self.pre = precomputed_dir
         self.pre2 = precomputed_dir2

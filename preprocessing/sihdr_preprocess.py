@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """SI-HDR (Hanji et al., SIGGRAPH 2022) -> a 512x512 evaluation split.
 
-This is the split the paper evaluates on. Download SI-HDR from its authors,
-then:
+Download SI-HDR from its authors, then:
 
     python preprocessing/sihdr_preprocess.py --dataset_root <SI-HDR> \
         --output_dir data/sihdr_clip95_512 --clip_level clip_95 --size 512
 
 The LDR inputs are the benchmark's OWN simulated captures, `input/clip_95/*.png`
-(or `clip_97`), not something we synthesise, so every method is scored on the
-images the benchmark itself defines. Each reference is centre-cropped to a
-square and resized to `--size`, and anchored the same way training targets are:
-the median luminance at `--median_nits`, `--peak_nits` mapping to 1. That
-anchoring is what every reported number uses; `--normalization percentile`
+(or `clip_97`). Each reference is centre-cropped to a square and resized to
+`--size`, and anchored the same way training targets are: the median luminance
+at `--median_nits`, `--peak_nits` mapping to 1. `--normalization percentile`
 builds a different, incomparable target set.
 
 Output is an ordinary split, which every script here reads unchanged:
@@ -20,12 +17,11 @@ Output is an ordinary split, which every script here reads unchanged:
     <out>/SIHDR_test.txt             index, one "target,guidance" per line
     <out>/SIHDR_test_target/*.npy    float32 linear [0,1], from their .exr
     <out>/SIHDR_test_guidance/*.npy  their capture, linearised
-    <out>/ldr_input/*.png            their capture, 8-bit and untouched
+    <out>/ldr_input/*.png            their capture, 8-bit
 
-Two guidance forms are written because methods differ in what they accept: the
-`.npy` is linear for models that want radiance, the `.png` is the original 8-bit
-file for those that want an image. Build the 8-bit twin with make_q8_split.py
-before scoring, so every method is fed the same precision.
+Two guidance forms are written: the `.npy` is linear for models that want
+radiance, the `.png` is 8-bit for those that want an image. Build the 8-bit twin
+with make_q8_split.py before scoring.
 
 For the doubly-clipped condition, see sihdr_pctclip_preprocess.py.
 """
@@ -60,16 +56,9 @@ def load_hdr(path):
 def normalize_median_anchor(arr, median_nits=20.0, peak_nits=1000.0):
     """Anchor the scene MEDIAN at a fixed display luminance; keep highlights.
 
-    This is the unbiased alternative to `normalize_hdr`. The percentile variant
-    truncates each image's own top 0.1% -- precisely the highlight detail an ITM
-    method is asked to reconstruct -- and lands the target in display-referred
-    [0,1], which happens to be the output space of our HDR+-trained models. Both
-    effects flatter us and penalise a method that emits scene-referred radiance.
-
-    Here every image gets the SAME absolute mapping: median -> median_nits,
-    ceiling at peak_nits. The clip at 1.0 is a display limit applied equally to
-    both methods rather than a content-dependent cut, and it matches the space
-    `general.target_encoding=pu21` trains in (peak_nits == PU21's l_peak).
+    Every image gets the SAME absolute mapping: median -> median_nits, ceiling
+    at peak_nits. This matches the space `general.target_encoding=pu21` trains
+    in (peak_nits == PU21's l_peak).
     """
     y = arr @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
     nz = y[y > 0]
@@ -82,10 +71,7 @@ def normalize_median_anchor(arr, median_nits=20.0, peak_nits=1000.0):
 
 
 def normalize_hdr(arr, top_percentile=99.9):
-    """Scale so the top percentile maps to 1.0. SI-HDR references are absolute
-    radiance with no fixed upper bound, so a percentile is the standard way to
-    put them on a relative [0,1] scale without letting one specular highlight
-    dominate."""
+    """Scale so the top percentile maps to 1.0."""
     v = np.percentile(arr, top_percentile)
     if not np.isfinite(v) or v <= 0:
         v = max(float(arr.max()), 1e-8)
@@ -106,8 +92,7 @@ def square_resize(arr, size):
 
 
 def jpeg_roundtrip(lin, quality):
-    """sRGB-encode, JPEG, decode, re-linearise. Models the 8-bit camera path;
-    LEDiff's inputs are ordinary photographs, not float buffers."""
+    """sRGB-encode, JPEG, decode, re-linearise. Models the 8-bit camera path."""
     import cv2
 
     srgb = np.rint(linear_to_srgb(lin) * 255).astype(np.uint8)
@@ -129,34 +114,25 @@ def main():
                     help="unpacked SI-HDR root containing reference/ and input/")
     ap.add_argument("--clip_level", default="clip_95",
                     choices=["clip_95", "clip_97"],
-                    help="which of their two simulated exposures to use. The "
-                         "names give the percent of HDR pixels RETAINED, so "
-                         "clip_95 clips 5%% and clip_97 clips 3%% -- both much "
-                         "milder than our HDR+ regimes (~18%% blown), which is "
-                         "worth stating when comparing across the two.")
+                    help="which of SI-HDR's two simulated exposures to use. "
+                         "The names give the percent of HDR pixels retained: "
+                         "clip_95 clips 5%% and clip_97 clips 3%%.")
     ap.add_argument("--output_dir", required=True)
     ap.add_argument("--size", type=int, default=512)
     ap.add_argument("--degradation", default="dataset",
                     choices=["dataset", "lediff_minus", "lediff_zero",
                              "lediff_plus"],
-                    help="'dataset' uses SI-HDR's own simulated captures, which "
-                         "clip HIGHLIGHTS ONLY (measured: 0.00%% of pixels at "
-                         "zero) -- so LEDiff's shadow arm, which assumes a "
-                         "C- input with crushed shadows, is being handed an "
-                         "image with none. The lediff_* modes synthesise the "
-                         "input from the reference EXR using LEDiff's OWN "
-                         "protocol (HDR-FLIP exposures + their randomised CRF), "
-                         "so each arm can be tested on the input it assumes: "
-                         "plus -> C+ (blown highlights, their highlight arm), "
-                         "minus -> C- (crushed shadows, their shadow arm), "
-                         "zero -> the middle exposure, clipped at BOTH ends, "
-                         "which is the realistic single-photo case and the one "
-                         "neither of their arms is designed for.")
+                    help="'dataset' uses SI-HDR's own simulated captures "
+                         "(highlight clipping only). The lediff_* modes "
+                         "synthesise the input from the reference with LEDiff's "
+                         "capture model (HDR-FLIP exposures + randomised CRF): "
+                         "plus -> blown highlights, minus -> crushed shadows, "
+                         "zero -> the middle exposure, clipped at both ends.")
     ap.add_argument("--normalization", default="median_anchor",
                     choices=["median_anchor", "percentile"],
                     help="How the reference is put on a [0,1] scale. "
-                         "'median_anchor' (default, and what every reported "
-                         "number uses) applies ONE fixed photometric mapping to "
+                         "'median_anchor' (default) applies ONE fixed "
+                         "photometric mapping to "
                          "every image: the median luminance to --median_nits, "
                          "--peak_nits to 1.0. 'percentile' instead scales each "
                          "image so its own 99.9th percentile hits 1.0, which "
@@ -216,9 +192,8 @@ def main():
         tgt = square_resize(norm, args.size)
 
         if args.degradation != "dataset":
-            # LEDiff's own degradation, applied to the reference radiance.
-            # Reusing scenehdr_preprocess so there is exactly one
-            # implementation of their protocol in the tree.
+            # LEDiff's own degradation, applied to the reference radiance,
+            # from scenehdr_preprocess.py.
             import importlib.util as _ilu
             _sp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "scenehdr_preprocess.py")
@@ -246,10 +221,8 @@ def main():
                 print(f"  {n}/{len(refs)}", flush=True)
             continue
 
-        # their capture, kept 8-bit for LEDiff and linearised for ours.
-        # NOTE: the dataset applies a CUSTOM CRF, not sRGB, so the sRGB inverse
-        # here is an approximation. It affects only our model's input; LEDiff
-        # gets the untouched PNG.
+        # their capture, linearised with the sRGB inverse. The dataset applies
+        # a CUSTOM CRF, not sRGB, so this is an approximation.
         sdr = np.asarray(Image.open(png).convert("RGB"), dtype=np.float32) / 255.0
         x = np.where(sdr <= 0.04045, sdr / 12.92,
                      ((sdr + 0.055) / 1.055) ** 2.4).astype(np.float32)
@@ -258,7 +231,7 @@ def main():
         np.save(os.path.join(d_t, name + ".npy"), tgt.astype(np.float32))
         np.save(os.path.join(d_g, name + ".npy"),
                 np.clip(gui, 0, 1).astype(np.float32))
-        # crop+resize the PNG identically so LEDiff sees the same pixels
+        # the PNG, cropped and resized identically to the guidance
         Image.fromarray(
             np.rint(np.clip(linear_to_srgb(gui), 0, 1) * 255).astype(np.uint8)
         ).save(os.path.join(d_l, name + ".png"))

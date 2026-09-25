@@ -2,10 +2,10 @@
 """Turn scene-referred HDR sources into the linear-RGB training pairs the model
 is trained on: a target image and the clipped LDR guidance synthesised from it.
 
-Build the paper's two splits through the wrapper scripts in this folder rather
-than calling this directly — `run_scenehdr_pct_build.sh` (ExpandDiff-P) and
-`run_scenehdr_c95_build.sh` (ExpandDiff-B) pass the settings each split needs.
-Call this directly to build a split of your own.
+Build the ExpandDiff-P and ExpandDiff-B training splits with the wrapper
+scripts in this folder, `run_scenehdr_pct_build.sh` and
+`run_scenehdr_c95_build.sh`, which pass the settings each split needs. Call
+this directly to build a split of your own.
 
 DEGRADATION, chosen with `--degradation`:
 
@@ -26,22 +26,13 @@ CAMERA RESPONSE, chosen with `--capture_model`:
                   I = (1 + b) * min(E,1)^g / (b + min(E,1)^g)
                   b ~ N(0.6, 0.1),  g ~ N(0.9, 0.1)
 
-              Randomising per image trains for an unknown response curve, and
-              re-linearising with sRGB rather than the true curve reproduces
-              what happens at inference, where an 8-bit photo arrives with its
-              response unknown. The ExpandDiff-B split uses this.
+              The ExpandDiff-B split uses this.
 
-TARGET SCALE. Scene radiance is unbounded, so it needs an anchor. Percentile
-normalisation is the usual trick and is wrong here: it clips the top fraction
-of a percent, which is precisely the highlights we are asking the model to
-reconstruct. Instead the scene MEDIAN is placed at a fixed display luminance
-(--median_nits, default 20 cd/m^2 -- photographic mid-grey on a 1000-nit
-display) and everything above runs freely up to --peak_nits. Highlights are
-kept, the scale is consistent across scenes, and it lines up with
-general.target_encoding=pu21, whose [0,1] range means exactly [0, peak_nits].
-Scenes brighter than the ceiling (direct sun) are clipped there; raise
---peak_nits to 10000 to keep them, at the cost of spending code values on
-luminances no display reproduces.
+TARGET SCALE. The scene MEDIAN is placed at a fixed display luminance
+(--median_nits, default 20 cd/m^2) and everything above runs freely up to
+--peak_nits. This lines up with general.target_encoding=pu21, whose [0,1] range
+means exactly [0, peak_nits]. Scenes brighter than the ceiling (direct sun) are
+clipped there; raise --peak_nits to 10000 to keep them.
 
 Panoramas are projected to regular images from random camera viewpoints, 5 per
 panorama by default; ordinary HDR images are centre-cropped and resized.
@@ -73,8 +64,8 @@ os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
 
 import numpy as np  # noqa: E402
 
-# ACES response at t=0.85, i.e. FLIP.h computeExposures(). Hard-coded rather
-# than re-derived so this file states the constant LEDiff's pipeline uses.
+# ACES response at t=0.85, i.e. FLIP.h computeExposures(): the constant LEDiff's
+# pipeline uses.
 FLIP_XMAX = 2.118874
 LUMA = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
 EXTS = ("*.exr", "*.EXR", "*.hdr", "*.HDR", "*.pfm", "*.PFM")
@@ -99,9 +90,8 @@ def srgb_to_linear(x):
 def clip_and_normalize_linear(linear, threshold_low, threshold_high):
     """Clip shadows + highlights in linear space, normalize to [0, 1] linear.
 
-    Copied verbatim from current_pipeline_linear_RGB.py so the `--degradation
-    stops` path is bit-identical to the HDR+ pipeline. If that one changes,
-    change this one too.
+    Identical to the function of the same name in current_pipeline_linear_RGB.py;
+    keep the two in sync.
     """
     if threshold_high - threshold_low < 0.05:
         threshold_high = threshold_low + 0.05
@@ -124,8 +114,7 @@ def luminance(rgb):
 def perspective_from_equirect(pano, out_h, out_w, yaw, pitch, fov_deg):
     """Gnomonic projection of an equirectangular panorama.
 
-    Bilinear, wrapping in longitude and clamping in latitude. Done in numpy so
-    this stays runnable without a GPU; a 4k panorama to 512x512 is ~10 ms.
+    Bilinear, wrapping in longitude and clamping in latitude.
     """
     H, W = pano.shape[:2]
     f = 0.5 * out_w / np.tan(np.radians(fov_deg) * 0.5)
@@ -211,8 +200,7 @@ def lediff_capture(lin, exposure, rng, quantize=True):
     ldr = np.clip(ldr, 0.0, 1.0)
     if quantize:
         ldr = np.rint(ldr * 255.0) / 255.0
-    # invert sRGB, not the true CRF: at deployment the curve is unknown and
-    # this same inverse is what gets applied, so train through the same gap
+    # invert sRGB, not the true CRF
     return srgb_to_linear(ldr.astype(np.float32)), beta, gamma
 
 
@@ -263,15 +251,9 @@ def main():
     ap.add_argument("--clip_repeats", type=int, default=1,
                     help="--degradation stops/percentile only: emit N guidance "
                          "images per target, each with an independently sampled "
-                         "clip. The target is written once and shared, so this "
-                         "costs guidance storage only. Use it instead of "
-                         "re-running with --append: with --exposures e0 the "
-                         "guidance filename equals the target base name, so a "
-                         "second pass would OVERWRITE the first and leave the "
-                         "index with duplicate lines pointing at one file. "
-                         "N=3 restores the pair count scenehdr_512 got from "
-                         "E-/E0/E+, but as three random clipping amounts rather "
-                         "than three fixed exposures.")
+                         "clip. The target is written once and shared. Use it "
+                         "instead of re-running with --append, which with "
+                         "--exposures e0 would overwrite the first pass.")
     ap.add_argument("--capture_model", default="none",
                     choices=["none", "lediff"],
                     help="applies to --degradation stops/percentile only "
@@ -289,27 +271,21 @@ def main():
                          "noise, which remains an unmodelled axis.")
     ap.add_argument("--clip_pct_high", type=float, nargs=2, default=[0.0, 30.0],
                     help="--degradation percentile only: percent of pixels to "
-                         "BLOW, sampled U[lo, hi] per image. 0 = untouched. "
-                         "SI-HDR's own test inputs sit at 5%% (clip_95) and 3%% "
-                         "(clip_97), so a range starting at 0 covers them and "
-                         "everything up to our HDR+ regimes (~18%%).")
+                         "BLOW, sampled U[lo, hi] per image. 0 = untouched.")
     ap.add_argument("--clip_pct_low", type=float, nargs=2, default=[0.0, 10.0],
                     help="--degradation percentile only: percent of pixels to "
                          "CRUSH, sampled U[lo, hi] per image. 0 = untouched.")
     ap.add_argument("--degradation", default="lediff",
                     choices=["lediff", "stops", "percentile"],
                     help="how the LDR guidance is made from the HDR target. "
-                         "'lediff' = their capture model: per-scene E-/E0/E+ "
-                         "from HDR-FLIP, randomised CRF, 8-bit quantisation, "
-                         "no explicit shadow clip. This is what scenehdr_512 "
-                         "used and what made 2.1i's falsification test valid. "
-                         "'stops' = OUR HDR+ recipe: hard clip to "
-                         "[2^shadow, 2^highlight] with both stops sampled "
-                         "uniformly per image, then linear rescale to [0,1]. "
-                         "The HDR+ models trained this way cover no-clip "
-                         "through heavy-clip and transfer to clipping rules "
-                         "they never saw, which is why they still beat the "
-                         "scene generalist on clip_95/clip_97.")
+                         "'lediff' = LEDiff's capture model: per-scene "
+                         "E-/E0/E+ from HDR-FLIP, randomised CRF, 8-bit "
+                         "quantisation, no explicit shadow clip. "
+                         "'stops' = hard clip to [2^shadow, 2^highlight] with "
+                         "both stops sampled uniformly per image, then linear "
+                         "rescale to [0,1]. 'percentile' = clip at sampled "
+                         "pixel percentiles (--clip_pct_high/--clip_pct_low), "
+                         "then linear rescale to [0,1].")
     ap.add_argument("--shadow_stops", type=float, nargs=2, default=[-12.0, -6.0],
                     help="--degradation stops only: U[lo, hi] per image, as in "
                          "current_pipeline_linear_RGB.py. -12 is effectively "
@@ -320,16 +296,7 @@ def main():
                          "unclipped examples in the training set.")
     ap.add_argument("--exposure_jitter", type=float, default=0.0,
                     help="stops of uniform jitter added to each capture "
-                         "exposure, U(-j, +j). LEDiff pins the capture to "
-                         "exactly E-/E0/E+, so the model sees only three "
-                         "clipping amounts; our HDR+ pipeline samples stops "
-                         "over a range instead, which is what lets it handle "
-                         "clipping rules it never trained on (clip_95/clip_97 "
-                         "threshold a luminance percentile, not an exposure). "
-                         "0.0 = off and bit-exact with the existing splits. "
-                         "1.0 is a reasonable first try: it spans 2 stops "
-                         "around each anchor without letting E- and E+ overlap "
-                         "on typical scenes (median bracket span is ~7 stops).")
+                         "exposure, U(-j, +j). 0.0 = off.")
     ap.add_argument("--exposures", default="e0", choices=["e0", "all"],
                     help="'e0' uses only the middle exposure, which is what a "
                          "normal photo looks like and what arrives at "
@@ -419,48 +386,24 @@ def main():
             np.save(os.path.join(d_t, base + ".npy"), tgt)
             picks = [("e0", e0)] if args.exposures == "e0" \
                 else [("em", e_lo), ("e0", e0), ("ep", e_hi)]
-            # N independently-sampled clips per target. Only meaningful for the
-            # randomised degradations -- the lediff capture is already pinned to
-            # its three exposures, so repeating it would just resample the CRF.
+            # N independently sampled clips per target, for the percentile and
+            # stops degradations only.
             if args.clip_repeats > 1 and args.degradation in ("percentile",
                                                               "stops"):
                 picks = [(f"{sfx}c{i}", exp)
                          for sfx, exp in picks
                          for i in range(args.clip_repeats)]
             for sfx, exp in picks:
-                # Jitter the exposure, HDR+-style. LEDiff's protocol pins the
-                # capture to exactly E-/E0/E+ per scene, so the model only ever
-                # sees three clipping amounts and the CRF (beta, gamma) is the
-                # sole source of variation. Our HDR+ pipeline instead samples
-                # stops uniformly over a RANGE per patch, which is why that
-                # model covers no-clip through heavy-clip and transfers to
-                # clipping rules it never saw -- e.g. clip_95/clip_97, which
-                # threshold a luminance PERCENTILE rather than an exposure, and
-                # where the scene generalist currently loses to the HDR+ one.
-                #
-                # jitter=0.0 is the default and reproduces the existing splits
-                # bit-exactly, so this cannot silently change anything already
-                # built.
+                # Jitter the exposure by U(-j, +j) stops; 0.0 (the default) is
+                # off.
                 if args.exposure_jitter > 0.0:
                     exp = exp + float(rng.uniform(-args.exposure_jitter,
                                                   args.exposure_jitter))
-                # guidance comes from the SAME radiance the target came from,
-                # so the pair stays consistent
+                # guidance comes from the SAME radiance the target came from
                 if args.degradation == "percentile":
-                    # Clip a random PERCENTAGE of pixels rather than at a fixed
-                    # radiance. Scale-invariant by construction, so it does not
-                    # care that the scene-referred median sits at 0.02 while
-                    # the HDR+ median sits at 0.1-0.3 -- the same setting means
-                    # the same thing on both. And it is the test protocol:
-                    # SI-HDR's clip_95/clip_97 blow 5% / 3% of pixels
-                    # (sihdr_preprocess.py:140), while our HDR+ regimes blow
-                    # ~18%, so a range from 0 covers the whole span.
-                    # Thresholds come from the MAX-CHANNEL percentile, not the
-                    # luminance percentile. clip_and_normalize_linear clips per
-                    # channel and a pixel reads as blown if ANY channel hits the
-                    # ceiling, so a luminance-derived threshold overshoots badly
-                    # -- measured, asking for 3% blew 12.9% and 5% blew 19.0%.
-                    # Off max-channel the requested percentage is exact.
+                    # Clip a random PERCENTAGE of pixels. The highlight
+                    # threshold is a percentile of each pixel's max channel, the
+                    # shadow threshold one of its min channel.
                     mx = tgt.max(axis=-1)
                     mn = tgt.min(axis=-1)
                     p_hi = float(rng.uniform(*args.clip_pct_high))
@@ -475,10 +418,8 @@ def main():
                         # only applies the CRF + 8-bit round trip.
                         gui, _, _ = lediff_capture(gui, 0.0, rng)
                 elif args.degradation == "stops":
-                    # OUR HDR+ recipe, applied to the normalised scene-referred
-                    # target rather than a linearised JPEG. Stops are sampled
-                    # per image so the model spans no-clip to heavy-clip, which
-                    # is the property that makes the HDR+ models transfer.
+                    # The clip of current_pipeline_linear_RGB.py, applied to
+                    # the normalised target, with stops sampled per image.
                     s_lo = float(rng.uniform(*args.shadow_stops))
                     s_hi = float(rng.uniform(*args.highlight_stops))
                     gui = clip_and_normalize_linear(tgt, 2.0 ** s_lo,
@@ -528,12 +469,12 @@ def main():
               f"(p10 {np.percentile(d, 10):.1f}, p90 {np.percentile(d, 90):.1f})")
         print(f"  -> LEDiff E0 clip point equals highlight_stops "
               f"{-(d.mean() / 2 + 1.083):+.2f} on average")
-    print("\ntrain with (PU21 targets, since these are scene-referred):\n"
-          f"  python train.py dataset=hdrplus_linrgb general.is_linear=true \\\n"
+    print("\ntrain with:\n"
+          f"  python training/train.py dataset=hdrplus_linrgb general.is_linear=true \\\n"
           f"    general.target_encoding=pu21 general.weight_logl1=0.0 \\\n"
           f"    dataset.train.data_dir={out} "
           f"dataset.train.file_list={args.prefix}_train.txt \\\n"
-          f"    general.suffix=scenehdr_pu21")
+          f"    general.suffix=<name>")
 
 
 if __name__ == "__main__":

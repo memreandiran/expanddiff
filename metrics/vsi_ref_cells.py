@@ -3,20 +3,18 @@
 driven through Octave.
 
   python metrics/vsi_ref_cells.py --split_dir <split> --condition <name> \
-      --arms <arm>[,<arm>...] [--out_dir fid_logs/vsi_ref] [--l_peak 1000]
+      --arms <arm>[,<arm>...] [--out_dir <dir>] [--l_peak 1000]
 
 Requires Octave and a gfxdisp/pu21 checkout: $PU21_M must contain m_vsi.m, and
-$OCT_BIN must point at an octave-cli binary. One Octave process per cell.
+$OCT_BIN must point at an octave-cli binary. One Octave process per arm.
 
-m_vsi.m is fed RAW PU21 units, as pu21_metric.m does. Do not rescale them into
-[0,255] first: its similarity constants are absolute, and rescaling shifts every
-score. rawdiffusion/evaluation/metrics/vsi_ref.py is the dependency-free
-equivalent, which agrees to about 1e-4 -- close, but not close enough to
-reproduce a published 4-decimal value, so prefer this script.
+m_vsi.m is fed RAW PU21 units, as pu21_metric.m does.
+rawdiffusion/evaluation/metrics/vsi_ref.py is a dependency-free approximation
+of m_vsi.m; prefer this script.
 
-For the corrected (+CRF) column use metrics/crf_ref2_cells.py.
+For CRF-corrected PU21-VSI use metrics/crf_ref2_cells.py.
 
-Writes fid_logs/vsi_ref/vsiref_<cond>_<arm>.yaml.
+Writes <out_dir>/vsiref_<cond>_<arm>.yaml.
 """
 import argparse, os, subprocess, sys, tempfile
 import numpy as np, tifffile, yaml

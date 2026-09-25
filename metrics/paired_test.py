@@ -6,9 +6,6 @@ its standard error, a 95% confidence interval, the per-image win rate and the
 median. Prints TIE when the interval straddles zero, and warns when the mean and
 the median disagree in sign.
 
-Use this rather than comparing means: per-image differences on this benchmark
-are heavy-tailed, so a sub-dB gap between means is routinely not significant.
-
   python metrics/paired_test.py --a <dir> --b <dir> \
       --target_dir <split>/SIHDR_test_target \
       [--guidance_dir <split>/SIHDR_test_guidance --direction highlight|shadow] \
@@ -48,14 +45,10 @@ _PU21_P = [0.353487901, 0.3735252458, 8.277049286e-05, 0.9062562627,
 
 
 def pu21(x, l_peak=1000.0):
-    """Mantiuk 2021 PU21 encoding -- the curve SI-HDR recommends, and the one
-    their 3.5 dB minimum-meaningful-difference is defined on.
+    """Mantiuk 2021 PU21 encoding.
 
-    The PSNR peak constant is deliberately omitted: this module only ever reports
-    PAIRED differences A-B, and a peak term enters both scores identically and
-    cancels. So win rates and paired CIs on this curve are exact regardless of
-    which PU21 peak convention one adopts -- which is otherwise a 4.3 dB
-    ambiguity (SESSION_NOTES: PU21_PEAK 256 vs an encoding reaching 420.1).
+    The PSNR peak constant is omitted: a peak term enters both scores of a pair
+    identically and cancels in the paired difference A-B.
     """
     p = _PU21_P
     Y = np.clip(x, 1e-8, 1.0) * l_peak

@@ -11,7 +11,7 @@ def gamma_correction(t, gamma=1.0 / 5):
 def linear_to_srgb(t):
     """Linear RGB tensor in [0, 1] -> sRGB-gamma-encoded tensor in [0, 1].
 
-    Uses the proper sRGB EOTF-inverse (piecewise: linear toe + 2.4 power).
+    Uses the sRGB EOTF-inverse (piecewise: linear toe + 2.4 power).
     Use this on linear-RGB targets/predictions before saving as PNG so that
     standard image viewers display them with correct tone.
     """
@@ -30,17 +30,14 @@ def srgb_to_linear(t):
 
 
 # --------------------------------------------------------------------------- #
-# Target encodings (opt-in; "none" is the default and leaves everything as-is)
+# Target encodings (opt-in; "none" is the default and leaves the target as-is)
 #
-# The tanh head can only emit a bounded value, which is fine for
-# display-referred data in [0, 1] but cannot represent scene-referred radiance.
-# Training against pu21(L) instead of L removes that limit without touching the
-# architecture: the target is bounded by construction, and decoding at
-# inference recovers ~17.6 stops (0.005 to 1000 cd/m^2). LEDiff does the same
-# thing with a log-space decoder.
+# With "pu21" the model is trained against pu21(L) instead of L. The encoded
+# target is bounded in [0, 1], and decoding recovers linear radiance over
+# 0.005 to 1000 cd/m^2 (~17.6 stops).
 #
-# These mirror pu21_encode_np / pu21_decode_np in datasets/bracket_ops.py --
-# keep the two in step, they are the encode and decode ends of one pipeline.
+# These mirror pu21_encode_np / pu21_decode_np in datasets/bracket_ops.py;
+# keep the two in step.
 # --------------------------------------------------------------------------- #
 _PU21_P = (0.353487901, 0.3734658629, 8.277049286e-05, 0.9062562627,
            0.09150303166, 0.9099517204, 596.3148142)
@@ -64,9 +61,8 @@ def pu21_encode(t, l_peak=1000.0):
 def pu21_decode(t, l_peak=1000.0):
     """Inverse of `pu21_encode`: PU21 prediction -> linear radiance in [0, 1].
 
-    This is where the bounded model output turns back into high dynamic range,
-    so it is the one step that must not be skipped when sampling a model
-    trained with `general.target_encoding=pu21`.
+    Must be applied when sampling a model trained with
+    `general.target_encoding=pu21`.
     """
     p1, p2, p3, p4, p5, p6, p7 = _PU21_P
     v = t.double().clamp(0.0, 1.0) * _pu21_vmax(l_peak)
@@ -76,26 +72,22 @@ def pu21_decode(t, l_peak=1000.0):
     return (y / l_peak).clamp(0.0, 1.0).to(t.dtype)
 
 
-# The OFFICIAL PU21 *metric* convention, from gfxdisp/pu21 (matlab/
-# pu21_encoder.m + pu21_metric.m). Deliberately different from pu21_encode
-# above, and both are needed:
+# The PU21 *metric* convention of the reference implementation, gfxdisp/pu21
+# (matlab/pu21_encoder.m + pu21_metric.m). It differs from pu21_encode above:
 #
-#   pu21_encode        normalises to [0,1] with l_peak. This is the TARGET
-#                      encoding -- a bounded range is the entire point -- and
-#                      it is the basis every LEDiff-comparison number in
-#                      LEDIFF_COMPARISON.md was computed on. Do not change it.
-#   pu21_encode_metric absolute cd/m^2 clamped to [0.005, 10000], RAW encode
+#   pu21_encode        normalises to [0,1] with l_peak. This is the target
+#                      encoding.
+#   pu21_encode_metric absolute cd/m^2 clamped to [0.005, 10000], raw encode
 #                      (no /vmax), so 100 nit maps to ~256 and PSNR is taken
-#                      against peak 256. This is the scale AIM 2025 and the
-#                      PU21 papers report.
+#                      against peak 256.
 PU21_L_MIN, PU21_L_MAX, PU21_PEAK = 0.005, 10000.0, 256.0
 
 
 def pu21_encode_metric(t, peak_nits=1000.0):
-    """Relative [0,1] -> raw PU21 units, matching the reference implementation.
+    """Relative [0,1] -> raw PU21 units, as in the reference implementation.
 
-    `peak_nits` says what 1.0 means in cd/m^2; our median-anchored targets use
-    1000, which sits inside the encoder's valid [0.005, 10000] range.
+    `peak_nits` says what 1.0 means in cd/m^2 (1000 for this repository's
+    targets). Luminance is clamped to the encoder's valid range [0.005, 10000].
     """
     p1, p2, p3, p4, p5, p6, p7 = _PU21_P
     y = (t.double() * peak_nits).clamp(PU21_L_MIN, PU21_L_MAX)
@@ -109,8 +101,7 @@ TARGET_ENCODINGS = ("none", "pu21")
 def decode_target(t, encoding):
     """Undo whatever `general.target_encoding` applied to the target.
 
-    Identity for "none", so calling it unconditionally on the existing
-    pipelines changes nothing.
+    Identity for "none", so it is safe to call unconditionally.
     """
     if encoding in (None, "none"):
         return t
@@ -212,7 +203,7 @@ def get_output_path(args):
         f"clipw{args.general.get('clip_loss_weight', 0.0)}"
         if args.general.get("clip_loss_weight", 0.0) > 0.0 else None,
         "clipch" if args.general.get("clip_mask_channel", False) else None,
-        # only appended when non-default, so existing runs keep their folders
+        # only appended when non-default
         f"enc{args.general.get('target_encoding', 'none')}"
         if args.general.get("target_encoding", "none") != "none"
         else None,

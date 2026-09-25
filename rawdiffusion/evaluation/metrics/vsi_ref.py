@@ -1,26 +1,17 @@
-"""VSI on raw PU21 units, matching `pu21_metric.m`'s calling convention.
+"""VSI on raw PU21 units, following `pu21_metric.m`'s calling convention.
 
 `pu21_metric.m` does `m_vsi(P_test, P_reference)` where P comes straight out of
-`pu21_encoder.encode`, i.e. RAW PU units that reach 420 at a 1000 cd/m^2 peak
+`pu21_encoder.encode`, i.e. raw PU units that reach 420 at a 1000 cd/m^2 peak
 and ~596 at 10,000. `m_vsi.m` applies no rescaling: its three similarity maps
-carry ABSOLUTE additive constants (constForVS 1.27, constForGM 386,
-constForChrom 130, all marked %fixed) tuned for 8-bit [0,255] input.
+carry absolute additive constants (constForVS 1.27, constForGM 386,
+constForChrom 130).
 
-`piq.vsi` instead does `x = x * 255 / data_range` -- "Scale to [0, 255] range to
-match scale of constant". Called with data_range = encode(1.0) = 420.1 that
-compresses the signal by 0.607 while the constants stay put, so every similarity
-ratio is pushed toward 1 and VSI reads HIGH. The bias grows with the error being
-measured, so it flatters poor reconstructions more than good ones.
+`vsi_raw_pu` is `piq.vsi`'s body without its `x = x * 255 / data_range` input
+rescaling, and uses piq's internals. piq's default constants equal m_vsi.m's.
 
-This function is `piq.vsi`'s body with the two rescale lines removed, reusing
-piq's own validated internals rather than reimplementing the algorithm. piq's
-default constants already equal m_vsi.m's.
-
-Agreement with the reference, measured on 10 SI-HDR images at C_p:
-    mean |diff| 1.4e-5, max 1.0e-4
-The residual is the 256x256 downsample inside SDSP: torch's bilinear
-`interpolate` against Octave's `imresize`. For an exact figure use
-`vsi_ref_cells.py`, which runs `m_vsi.m` itself (agrees to 5e-10).
+The result is not identical to `m_vsi.m`: the 256x256 downsample inside SDSP
+uses torch's bilinear `interpolate` instead of `imresize`. For reference values
+use `vsi_ref_cells.py`, which runs `m_vsi.m` itself.
 """
 from __future__ import annotations
 
@@ -33,10 +24,10 @@ def vsi_raw_pu(x: torch.Tensor, y: torch.Tensor, reduction: str = "mean",
                alpha: float = 0.4, beta: float = 0.02, omega_0: float = 0.021,
                sigma_f: float = 1.34, sigma_d: float = 145.0,
                sigma_c: float = 0.001) -> torch.Tensor:
-    """VSI of two (N,3,H,W) tensors already in RAW PU21 units.
+    """VSI of two (N,3,H,W) tensors already in raw PU21 units.
 
     No data_range: the values are passed to the similarity maps unscaled, which
-    is what `pu21_metric.m` does. Do NOT normalise the inputs first.
+    is what `pu21_metric.m` does. Do not normalise the inputs first.
     """
     from piq.vsi import (gradient_map, rgb2lmn, scharr_filter, sdsp,
                          similarity_map)
@@ -48,8 +39,8 @@ def vsi_raw_pu(x: torch.Tensor, y: torch.Tensor, reduction: str = "mean",
     if x.size(1) == 1:
         x, y = x.repeat(1, 3, 1, 1), y.repeat(1, 3, 1, 1)
 
-    # NOTE: piq.vsi rescales to [0,255] here. The reference does not, so the
-    # next two lines of the original are deliberately absent.
+    # piq.vsi rescales to [0,255] here; the reference does not, so that step
+    # is omitted.
     vs_x = sdsp(x, data_range=255, omega_0=omega_0, sigma_f=sigma_f,
                 sigma_d=sigma_d, sigma_c=sigma_c)
     vs_y = sdsp(y, data_range=255, omega_0=omega_0, sigma_f=sigma_f,

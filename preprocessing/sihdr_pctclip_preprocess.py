@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 """SI-HDR -> a condition clipped at BOTH ends, from the same references.
 
-The benchmark's own inputs clip highlights only: not one of its 181 captures has
-a crushed pixel. A real photograph is clipped at both ends, so this builds a
-condition that is, applying the training degradation of Eq. (1) at fixed
-percentages rather than sampled ones:
+Applies the training degradation of Eq. (1) at fixed percentages rather than
+sampled ones:
 
     python preprocessing/sihdr_pctclip_preprocess.py --dataset_root <SI-HDR> \
         --output_dir data/sihdr_cp_512 --clip_pct_low 5 --clip_pct_high 15
 
 The defaults 5 and 15 are the means of the training distribution (U[0,10] and
-U[0,30]), which is the condition the paper reports; doubling them to 10 and 30
-gives the harder one. Thresholds are percentiles of the per-pixel MAX and MIN
-channel, not of luminance: a pixel counts as clipped when any channel reaches a
-bound, so a luminance-derived threshold overshoots badly -- asking for 3% blown
-gave 12.9% in testing, while the channel-wise thresholds hit the requested
-percentage exactly.
+U[0,30]); 10 and 30 give a harder condition. Thresholds are percentiles of the
+per-pixel MAX and MIN channel, not of luminance.
 
 The target, the anchoring and the resize are identical to sihdr_preprocess.py,
 so the two conditions share a target set and differ only in the input. Output is
@@ -43,9 +37,9 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--dataset_root", required=True)
 ap.add_argument("--output_dir", required=True)
 ap.add_argument("--clip_pct_low", type=float, default=5.0,
-                help="percent of pixels crushed (mean of P's U[0,10])")
+                help="percent of pixels crushed (default: midpoint of ExpandDiff-P's U[0,10])")
 ap.add_argument("--clip_pct_high", type=float, default=15.0,
-                help="percent of pixels blown (mean of P's U[0,30])")
+                help="percent of pixels blown (default: midpoint of ExpandDiff-P's U[0,30])")
 ap.add_argument("--size", type=int, default=512)
 ap.add_argument("--median_nits", type=float, default=20.0)
 ap.add_argument("--peak_nits", type=float, default=1000.0)
@@ -85,8 +79,8 @@ for f in refs:
     bl.append((gui >= 1.0).mean()); cr.append((gui <= 0.0).mean())
     np.save(os.path.join(d_t, name + ".npy"), tgt.astype(np.float32))
     np.save(os.path.join(d_g, name + ".npy"), np.clip(gui, 0, 1).astype(np.float32))
-    # 8-bit sRGB for the arms that consume a PNG (LEDiff, DITM, ExpandNet,
-    # MaskHDR, Refusion) -- identical treatment to every other split.
+    # 8-bit sRGB for the methods that read a PNG (LEDiff, DITM, ExpandNet,
+    # MaskHDR, Refusion-HDR).
     Image.fromarray(
         np.rint(np.clip(_sh.linear_to_srgb(gui), 0, 1) * 255).astype(np.uint8)
     ).save(os.path.join(d_l, name + ".png"))

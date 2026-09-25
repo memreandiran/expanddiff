@@ -175,9 +175,9 @@ def crf_correction(Ir, Igt, deg=3, lam=0.01, ptf_type="pq", cspace="luv",
 
 
 def correct(pred_rgb, ref_rgb, l_peak=1000.0):
-    """Drop-in for sihdr_crf_correct.correct, on the reference basis.
+    """CRF-correct `pred_rgb` against `ref_rgb` -> (corrected, info).
 
-    Our data is display-referred [0,1] with 1.0 = l_peak cd/m^2 (the l_peak
+    Inputs are display-referred [0,1] with 1.0 = l_peak cd/m^2 (the l_peak
     every PU21 metric here uses). pu21_metric.m demands ABSOLUTE luminance and
     calls crf_correction with normalize=0, so scale in and back out.
     """

@@ -10,7 +10,7 @@ dataset:
 checkpoint_name: "last.ckpt"
 # Load this checkpoint file directly instead of resolving one from the
 # experiment directory the training config would name. Set it to use a
-# released checkpoint; leave null to keep the previous behaviour.
+# released checkpoint; leave null to resolve it from the experiment directory.
 checkpoint_path: null
 save_pred: false
 save_tar: false

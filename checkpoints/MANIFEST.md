@@ -85,6 +85,12 @@ DDIM-24 sampling.
 | linear, tanh | `scenehdr_pct3_512` | linear | yes | 32 | 2e-4 | 150k |
 | linear, no tanh | `scenehdr_pct3_512` | linear | **no** | 32 | 2e-4 | 150k |
 
+The `data` column is the split name stored in each checkpoint: `scenehdr_pct3_512` is
+built by `preprocessing/run_scenehdr_pct_build.sh`, `scenehdr_c95_512` by
+`preprocessing/run_scenehdr_c95_build.sh`, `scenehdr_512` by `scenehdr_preprocess.py
+--degradation lediff --exposures all`, and D's split by
+`preprocessing/current_pipeline_linear_RGB.py`.
+
 Note that **P and B differ in learning rate as well as in training degradation**
 (2e-4 vs 1e-4). The three ablation rows are matched to P on every field except
 the one each varies, and S is matched to P except in its training degradation.

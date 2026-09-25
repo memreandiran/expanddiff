@@ -10,7 +10,7 @@ image files, with no ground truth needed, use `inference_custom.py` instead.
         dataset.train.file_list=SceneHDR_train.txt dataset.train.batch_size=32 \
         dataset.val.data_dir=<test split> dataset.val.file_list=<list>.txt \
         general.max_steps=150000 general.lr_scheduler=cosine \
-        general.suffix=scenehdr_pct3 general.check_val_every_n_epoch=10
+        general.suffix=<name> general.check_val_every_n_epoch=10
 
 WHICH CHECKPOINT GETS LOADED. Either the one you name, or one resolved from the
 config:
@@ -38,20 +38,17 @@ WHAT YOU GET, under `<experiment>/inference_sampling/<val split name>/`:
     metric.yaml                                   aggregate scores over the split
     per_image_stats.txt                           the same, per image
 
-⚠ The scores written here are computed on the RAW prediction, before the
-brightness alignment described in the paper, so they are several dB below the
-published numbers and are not comparable to them. They are a sanity check while
-sampling. To reproduce a reported number, take the tiffs, run `metrics/align.py`
-over them, then score with the tools in `metrics/`; `metrics/README.md` walks
-through it end to end.
+The scores written here are computed on the raw prediction, before brightness
+alignment, so they are not comparable to aligned scores and serve only as a
+sanity check while sampling. To score the predictions, take the tiffs, run
+`metrics/align.py` over them, then score with the tools in `metrics/`;
+`metrics/README.md` walks through it end to end.
 
 The predicted tiff is scene-linear: multiply by 1000 for cd/m^2, or apply a tone
 map before viewing. Predictions are decoded out of PU21 before being written, so
 every downstream tool reads plain linear radiance.
 """
-# Make the repository root importable no matter where this is run from:
-# Python puts the SCRIPT's directory on sys.path, not the working directory, so
-# `python training/train.py` would otherwise fail to find `rawdiffusion`.
+# Make the repository root importable no matter where this is run from.
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
@@ -208,9 +205,8 @@ def main(cfg: DictConfig) -> None:
 
     # `checkpoint_path=<file>` loads that checkpoint directly, which is how a
     # released checkpoint is used: the experiment directory is still derived
-    # from the config and still receives the outputs, but nothing has to be
-    # copied into it first. Left unset, the checkpoint is resolved from that
-    # directory exactly as before.
+    # from the config and still receives the outputs. Left unset, the
+    # checkpoint is resolved from that directory.
     checkpoint_path = cfg.get("checkpoint_path", None) or os.path.join(
         experiment_folder, "checkpoints", cfg.checkpoint_name
     )
@@ -226,9 +222,7 @@ def main(cfg: DictConfig) -> None:
     print(f"inference output name: {output_name}")
 
     # Architecture settings come from the checkpoint itself, so a checkpoint
-    # trained without the bounded head is not silently rebuilt with one. The
-    # config default (out_tanh: True) would otherwise win, and the only symptom
-    # is a wrong reconstruction: tanh applied to a model that never had it.
+    # trained without the bounded head is rebuilt without it.
     _ck = torch.load(checkpoint_path, map_location="cpu",
                      weights_only=False).get("hyper_parameters", {})
     _ck_model = _ck.get("model", {}) if isinstance(_ck, dict) else {}
@@ -252,17 +246,8 @@ def main(cfg: DictConfig) -> None:
     )
 
     sample_center_crop = bool(cfg.get("sample_center_crop", False))
-    # ⚠ target_encoding MUST be passed here. Without it create_dataset defaults
-    # to "none", the loader returns a LINEAR target, and the decode_target call
-    # below then decodes a target that was never encoded -- a double decode that
-    # collapsed the GT toward black on every PU21 run. Verified 2026-08-28:
-    # _gt_srgb.png matched linear_to_srgb(pu21_decode(target)) at mean 19.20
-    # against an observed 19.10, where the correct render is mean 72.30.
-    # train.py has always passed it to BOTH datasets (train.py:433-442), so
-    # training and val metrics were never affected -- only sample.py's previews
-    # and its own (already-discarded, unaligned) metric.yaml.
-    # Predictions are UNCHANGED by this fix: `sample` comes from the model, is
-    # always encoded, and is decoded exactly once either way.
+    # target_encoding must be passed here, so the loader returns the target
+    # encoded like the prediction; decode_target below then decodes both once.
     data_val = create_dataset(
         **cfg.dataset.val,
         transform=sample_center_crop,
@@ -271,10 +256,8 @@ def main(cfg: DictConfig) -> None:
         target_encoding=cfg.general.get("target_encoding", "none"),
     )
     # The data below is moved to the GPU explicitly, so the module has to be
-    # too. A checkpoint written during GPU training happens to restore onto
-    # the GPU by itself, which is why this was never needed before; a
-    # checkpoint saved from CPU (every released one) restores onto the CPU
-    # and the first convolution then fails on mismatched tensor types.
+    # too: a checkpoint saved from CPU (every released one) restores onto the
+    # CPU.
     raw_module.eval()
     if torch.cuda.is_available():
         raw_module.cuda()
@@ -306,21 +289,20 @@ def main(cfg: DictConfig) -> None:
         "cosine_distance": CosineDistanceMetric(),
     }
     # PU-encoded PSNR/SSIM are calibrated for *linear* luminance, so only
-    # add them when the inputs are linear-RGB. Applying PU to sRGB-encoded
-    # values would double-warp the tone curve.
+    # add them when the inputs are linear-RGB.
     if cfg.general.is_linear:
         metrics_dict["pu_psnr"] = PUPSNRMetric()
         # PU21 (Mantiuk 2021) -- a different curve from the Aydin PU above,
-        # and the one AIM 2025 ranks on. Reported alongside, not instead.
+        # computed alongside it.
         metrics_dict["pu21_psnr"] = PU21PSNRMetric()
         metrics_dict["pu21_ssim"] = PU21SSIMMetric()
-        # reference convention (gfxdisp/pu21): `pu21_psnr_ref` is the field the
-        # paper reports and the only one comparable to a published PU21-PSNR.
-        # The normalised `pu21_psnr` above is a different convention and differs
-        # from it by a constant, so never quote the two interchangeably.
+        # reference convention (gfxdisp/pu21): `pu21_psnr_ref` is the one
+        # comparable to a published PU21-PSNR. The normalised `pu21_psnr` above
+        # is a different convention and differs from it by a constant, so never
+        # quote the two interchangeably.
         metrics_dict["pu21_psnr_ref"] = PU21PSNRMetric(convention="reference")
         metrics_dict["pu21_ssim_ref"] = PU21SSIMMetric(convention="reference")
-        # mu-law: the Kalantari-lineage headline, and what ExpoCM reports
+        # mu-law PSNR/SSIM
         metrics_dict["mu_psnr"] = MuLawPSNRMetric()
         metrics_dict["mu_ssim"] = MuLawSSIMMetric()
         metrics_dict["pu_ssim"] = PUSSIMMetric()
@@ -440,7 +422,7 @@ def main(cfg: DictConfig) -> None:
             # This is the step that turns a bounded tanh prediction back into
             # high dynamic range. Target and prediction are both encoded, so
             # both are decoded; guidance never was, so it is left alone.
-            # Identity when target_encoding=none, i.e. for every existing run.
+            # Identity when target_encoding=none.
             enc = cfg.general.get("target_encoding", "none")
             sample = decode_target(sample, enc)
             target_data = decode_target(target_data, enc)
@@ -468,7 +450,7 @@ def main(cfg: DictConfig) -> None:
 
                 # Load precomputed clipmasks written by the preprocessing
                 # pipeline. Falls back to in-place computation if the file
-                # is missing (older runs).
+                # is missing.
                 #   shadow clipped       -> blue
                 #   highlight clipped    -> red
                 #   original (source)    -> pastel shade of the same hue

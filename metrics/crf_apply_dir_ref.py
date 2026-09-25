@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 """Write CRF-corrected copies of a prediction directory, so that HDR-VDP-3 can be
-run on the corrected basis.
+run on the corrected predictions.
 
   python metrics/crf_apply_dir_ref.py --data_dir <split> \
       --pred_dir <arm>/pred --file_list SIHDR_test.txt --out_dir <arm>_crf/pred
 
-The correction is applied with no clamping on either side, matching
-crf_ref2_cells.py and the reference implementation.
+The correction is applied with no clamping on either side, as in
+crf_ref2_cells.py.
 """
-# Make the repository root importable no matter where this is run from:
-# Python puts the SCRIPT's directory on sys.path, not the working directory.
+# Make the repository root importable no matter where this is run from.
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
@@ -23,7 +22,7 @@ import tifffile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compute_ref_metrics import hwc, read_pairs  # noqa: E402
-from sihdr_crf_correct_ref import correct as _crf  # noqa: E402  REFERENCE basis
+from sihdr_crf_correct_ref import correct as _crf  # noqa: E402
 
 
 def main():

@@ -1,29 +1,24 @@
 """Dataset for the two-specialist (LEDiff-inspired) pipeline.
 
-Phase 1 of dual_head_specs.md trains two ordinary single-head models on the
-SAME symmetric guidance but different targets:
+Two single-head models are trained on the same symmetric guidance but
+different targets:
 
     Model H (highlight specialist):  L0 -> L-   shadows clipped, highlights intact
     Model S (shadow specialist):     L0 -> L+   highlights clipped, shadows intact
 
 All three variants are synthesised on the fly from the unclipped target patch
-`L` that is already on disk, so no re-preprocessing is needed and the stored
-guidance is not used at all:
+`L` on disk; the stored guidance is not used:
 
     L0 = (clip(L, t_lo, t_hi) - t_lo) / (t_hi - t_lo)     # guidance / input
     L- = (clip(L, t_lo, 1.0)  - t_lo) / (1.0 - t_lo)      # H target
     L+ =  clip(L, 0.0, t_hi)  / t_hi                      # S target
 
-Because stops are re-drawn per patch per epoch, this is strictly more
-augmentation than the fixed per-patch stops baked into the preprocessed data.
-
-Validation/test uses the deterministic MIDPOINT stops, matching what the
-preprocessors write, so numbers stay comparable to every existing checkpoint.
+Training re-draws the stops per patch per epoch. Validation/test uses the
+deterministic midpoint stops, matching what the preprocessors write.
 
 `target_variant` selects which array lands in `target_data`, which is the only
-key train.py reads. So Model H and Model S differ by one config value and no
-code changes. `return_all=True` additionally exposes every variant, for the
-Phase 2 fusion module.
+key train.py reads, so Model H and Model S differ by one config value.
+`return_all=True` additionally exposes every variant, for the fusion module.
 """
 import os
 
@@ -43,7 +38,7 @@ class BracketRGBImageDataset(RGBImageDataset):
         target_variant: which array becomes `target_data`:
             "highlight" -> L-   (train Model H)
             "shadow"    -> L+   (train Model S)
-            "full"      -> L    (reproduces current single-head behaviour)
+            "full"      -> L    (the single-head target)
         is_train: True draws stops uniformly per patch; False uses the
             deterministic midpoint of each range.
         return_all: also return target_full / target_highlight / target_shadow
@@ -93,12 +88,9 @@ class BracketRGBImageDataset(RGBImageDataset):
 
         chosen = {"highlight": l_minus, "shadow": l_plus, "full": full}[
             self.target_variant]
-        # Encode the TARGET only, and only after the bracket is built: clipping
-        # is a physical sensor effect and must happen in linear radiance. With
-        # target_encoding="pu21" the model predicts perceptually-uniform values
-        # that are bounded in [0,1], so the tanh head can represent ~17.6 stops
-        # of scene-referred HDR instead of a [0,1] display-referred image.
-        # Decode with bracket_ops.pu21_decode_np at inference.
+        # Encode the target only, and only after the bracket is built: clipping
+        # must happen in linear radiance. Decode with
+        # bracket_ops.pu21_decode_np at inference.
         chosen = ENCODINGS[self.target_encoding](chosen)
 
         out = {
@@ -107,8 +99,7 @@ class BracketRGBImageDataset(RGBImageDataset):
             "path": os.path.relpath(guidance_path, self.dataset_path),
         }
         if self.return_all:
-            # same encoding as `chosen`, so a fusion head trained on these sees
-            # one consistent space rather than a mix of encoded and linear
+            # same encoding as `chosen`
             enc = ENCODINGS[self.target_encoding]
             out["target_full"] = self.np2tensor(enc(full)).float() * 2 - 1
             out["target_highlight"] = self.np2tensor(enc(l_minus)).float() * 2 - 1

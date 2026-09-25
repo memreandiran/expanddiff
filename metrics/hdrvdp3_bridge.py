@@ -13,8 +13,7 @@ through, so exporting it is enough.
 DIAG_IN, RES_W, RES_H and DIST_M have no defaults on the Octave side; unset
 gives NaN for every image. They are written into the output yaml. The metric
 depends strongly on angular resolution, so results at different geometries are
-not comparable; the values above give ~63 pixels per degree and are the ones
-used throughout.
+not comparable; the values above give ~63 pixels per degree.
 
 `rgb-native` expects absolute linear cd/m^2, so both sides are multiplied by
 $PEAK_NITS (default 1000).

@@ -1,19 +1,11 @@
 """Spatial attention fusion: route each pixel between model prediction(s) and
 the guidance.
 
-Motivation is measured, not hypothetical. In the FID sweep the analytic
-inverse-rescale baseline beat every trained model on 27 of 29 arms, because it
-is exact on unclipped pixels while the diffusion model perturbs the whole
-image. Unclipped pixels are the large majority (a 128x128 highlight-biased crop
-averages only ~36% clipped, a shadow-biased one ~8%). A router that learns to
-pass the guidance through where it is already correct keeps that fidelity while
-leaving the model responsible only for destroyed content.
-
 Softmax over per-pixel logits guarantees the weights sum to 1, so the output
 stays a convex combination of its inputs and cannot drift out of range.
 
 Two arities:
-  n_sources=2  [x_hat, L0]              -> bolt onto the existing single-head model
+  n_sources=2  [x_hat, L0]              -> on top of a single-head model
   n_sources=3  [x_minus, L0, x_plus]    -> the two-specialist setup
 
 All tensors are expected in [-1, 1], the same convention the U-Net uses.
@@ -29,13 +21,8 @@ class SpatialAttentionFusion(nn.Module):
             n_sources: how many images are being blended (2 or 3).
             width: hidden channels.
             use_soft_mask: append 2 channels derived from the guidance marking
-                how close it is to the clip limits. This is computed from the
-                INPUT only, so it exists at inference on any photo. It carries
-                no information the net could not derive from L0 itself, so treat
-                it as a convergence aid. A soft ramp rather than a hard
-                threshold, because real 8-bit/JPEG inputs do not sit exactly at
-                0 or 1 (measured: 7.3% of FiveK guidance pixels land in
-                (0, 2/255]).
+                how close it is to the clip limits, as a soft ramp. This is
+                computed from the input only.
         """
         super().__init__()
         if n_sources not in (2, 3):
@@ -50,9 +37,7 @@ class SpatialAttentionFusion(nn.Module):
             nn.Conv2d(width // 2, n_sources, 3, padding=1),
         )
         # Start near "pass the guidance through": zero the last conv so all
-        # logits are equal at init, then bias the guidance slot upward. Without
-        # this the router starts at a uniform blend, which is a worse image than
-        # either input and wastes early steps.
+        # logits are equal at init, then bias the guidance slot upward.
         nn.init.zeros_(self.net[-1].weight)
         with torch.no_grad():
             self.net[-1].bias.zero_()

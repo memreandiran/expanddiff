@@ -12,12 +12,11 @@
 #   <out dir>     where to put the 8-bit twin, the predictions and the yamls
 #
 # What it does, in order:
-#   1  build the 8-bit twin of the split, so the model is fed what other
-#      methods are fed  (skipped if it already exists)
+#   1  build the 8-bit twin of the split (skipped if it already exists)
 #   2  sample from the twin
 #   3  fit the per-image brightness gain against the ORIGINAL split
 #   4  score: PU21-PSNR and the rest
-#   5  optionally PU21-VSI, the corrected columns, PU21-PIQE, FID-R and
+#   5  optionally PU21-VSI, +CRF PU21-PSNR and PU21-VSI, PU21-PIQE, FID-R and
 #      HDR-VDP-3, each skipped with a message if its dependency is absent
 #
 # Run it from the repository root. Exits nonzero if any stage fails.
@@ -49,10 +48,8 @@ fi
 echo
 echo "########## 2. sampling ##########"
 mkdir -p "$OUT/logs"
-# A distinct suffix per (checkpoint, split) keeps two runs out of one
-# experiment directory: the directory is named from the config, not from the
-# checkpoint, so without this a second run writes alongside the first and the
-# predictions of the two become impossible to tell apart.
+# A distinct suffix per (checkpoint, split) gives each run its own experiment
+# directory, which is named from the config, not from the checkpoint.
 SUFFIX=eval_${ARM}_$(basename "$SPLIT")
 "$PY" training/sample.py "checkpoint_path=$CKPT" \
     general.is_linear=true "general.target_encoding=$ENC" \
@@ -102,9 +99,9 @@ if command -v octave-cli >/dev/null 2>&1 || command -v octave >/dev/null 2>&1; t
       --out_dir "$OUT/yaml/vsi" || { echo "FAILED: PU21-VSI"; FAIL=$((FAIL+1)); }
   "$PY" metrics/crf_ref2_cells.py --split_dir "$SPLIT" --file_list "$INDEX" \
       --condition "$(basename "$SPLIT")" --arms "${ARM}_scale" --pred_root "$OUT" \
-      --out_dir "$OUT/yaml/crf" || { echo "FAILED: corrected columns"; FAIL=$((FAIL+1)); }
+      --out_dir "$OUT/yaml/crf" || { echo "FAILED: +CRF PU21-PSNR and PU21-VSI"; FAIL=$((FAIL+1)); }
 else
-  echo "SKIP PU21-VSI and the corrected columns: Octave not on PATH"
+  echo "SKIP PU21-VSI and +CRF PU21-PSNR/VSI: Octave not on PATH"
 fi
 
 if [ -n "${VDP_ROOT:-}" ]; then

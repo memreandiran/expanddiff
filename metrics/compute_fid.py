@@ -12,9 +12,8 @@ at independent locations from the same targets.
       --crop_size 128 --crops_per_image 60 --seed 1234 \
       --reference_crops 20000 --reference_seed 99991 --out fid.yaml
 
-Average over --seed 1234, 7 and 99; the crop sample moves FID by an amount
-comparable to small differences between methods. Keep --reference_seed fixed so
-the reference crop set is identical across those runs.
+Average over --seed 1234, 7 and 99. Keep --reference_seed fixed so the
+reference crop set is identical across those runs.
 
 --device defaults to cuda; pass cpu explicitly off-GPU. If torch-fidelity cannot
 be constructed the script falls back to torchvision's inception_v3 and records
@@ -51,17 +50,9 @@ def linear_to_srgb(x):
 def reinhard(x, key=0.18, delta=1e-6):
     """Reinhard et al. (2002) global photographic operator, then sRGB gamma.
 
-    This exists to bridge to LEDiff's Table 1, whose FID-R column tone-maps
-    with Reinhard before computing FID. Their other two columns use Durand
-    (bilateral, local) and Liang (L1-L0 layer decomposition); neither is
-    reimplemented here, and a substitute would not be comparable, so only the
-    -R column is offered.
-
-    Note the key normalisation is PER IMAGE, so prediction and ground truth are
-    each auto-exposed independently. That cancels absolute-scale error, which
-    is what makes the operator usable across scene- and display-referred data
-    -- but it also means this encoding cannot see a pure brightness offset.
-    LEDiff's numbers carry the same property, so the comparison stays fair.
+    The key normalisation is per image, so prediction and ground truth are
+    each auto-exposed independently. This encoding therefore cannot see a
+    pure brightness offset.
     """
     x = np.clip(np.asarray(x, dtype=np.float32), 0.0, None)
     lw = x @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
@@ -104,9 +95,7 @@ def sample_boxes(h, w, n, crop, rng, mask=None, min_coverage=0.02, oversample=40
     With a mask, boxes are biased to regions where clipping actually happened:
     candidates are drawn uniformly, then filtered to coverage >=
     min_coverage. If too few qualify we fall back to the highest-coverage
-    candidates -- the caller counts those, because a run where most boxes fell
-    back is measuring mostly-unclipped content and the number is not the
-    hallucination signal it claims to be. Deterministic given `rng`."""
+    candidates, and the caller counts those. Deterministic given `rng`."""
     if h < crop or w < crop:
         return [], np.zeros(0)
     if mask is None:
@@ -221,20 +210,8 @@ def default_mask_eps(data_dir):
     """eps for clipmasks: 0.0, i.e. clipped means EXACTLY black (0) or EXACTLY
     white (1.0 == 255/255).
 
-    The stored `_clipmasks.npy` on disk were written with eps=2/255 (verified
-    bit-for-bit on both FiveK and HDR+ splits), but that tolerance is an 8-bit
-    quantization allowance and is wrong for float32 linear data: it treats a
-    target pixel at 0.003 as "already black" and therefore drops it from the
-    artificial-clip mask, even though the clip genuinely destroyed signal
-    there. In linear space 0.003 is dark, not black.
-
-    So this script recomputes masks at eps=0.0 by default rather than reading
-    the stored ones -- which also keeps a single definition across every split
-    in a sweep, instead of mixing stored (2/255) and recomputed masks. Pass
-    --mask_source stored to read the on-disk masks instead.
-
-    The choice matters: on HDR+ `-12_-4_-4_0`, eps=0 gives 0.033 shadow
-    coverage where the stored 2/255 mask gives 0.000.
+    Masks are recomputed at this eps by default rather than read from the
+    stored `_clipmasks.npy`.
     """
     return 0.0
 
@@ -243,13 +220,11 @@ def load_clipmask(data_dir, guidance_rel, target_rel, region, eps,
                   mask_source="recompute"):
     """The art_{shadow,highlight}_any mask for `region`.
 
-    Default is to recompute from target+guidance at `eps` (see
-    default_mask_eps for why the stored masks are not used), with the same
+    Default is to recompute from target+guidance at `eps`, with the same
     structure as sample.py:compute_clipmasks_fallback -- artificial clipping is
     "guidance at the limit AND target not at the limit", reduced over channels
     with .any(). mask_source='stored' reads the preprocessed 8-channel file
-    instead, falling back to recompute where absent (some splits, e.g.
-    hdrplus_linrgb_full_-12_-6_-2_0_d4, predate the mask writer)."""
+    instead, falling back to recompute where it is absent."""
     if region == "all":
         return None
     if mask_source == "stored":
@@ -271,14 +246,9 @@ _REF_CACHE = {}
 
 def reference_family(data_dir):
     """Dataset identity for reference sharing, with the clipping stops stripped
-    out of the split name.
-
-    The unclipped TARGETS are identical across every stop variant of a dataset
-    (verified: same 32,681 FiveK / 30,052 HDR+ target lists, byte-identical
-    pixels), because the stops only change the guidance. So all FiveK splits
-    share one reference and all HDR+ splits share another, instead of
-    rebuilding the same 20k crops 15 times. The downsample suffix stays in the
-    key so a d2 and a d4 variant never share.
+    out of the split name, so every stop variant of a dataset shares one
+    reference. The downsample suffix stays in the key so a d2 and a d4 variant
+    never share.
     """
     base = os.path.basename(data_dir.rstrip("/"))
     num = r"-?\d+(?:\.\d+)?"
@@ -305,20 +275,12 @@ def reference_indices(data_dir, source):
 def domain_reference_features(data_dir, encoding, n_crops, crop_size,
                               extractor, seed, batch_size, train_list=None,
                               source="all"):
-    """Unpaired reference for the PURELY GENERATIVE framing: Inception features
-    of real target patches drawn from the split's TRAIN targets.
+    """Unpaired reference: Inception features of random crops of real target
+    patches, drawn from the index files that reference_indices(data_dir,
+    source) returns, or from `train_list` if given. No scene correspondence
+    with the predictions is used.
 
-    This answers "do the outputs look like real photographs of this domain",
-    with no scene correspondence checked at all. It is the standard
-    generative-model protocol: reference statistics come from the dataset, not
-    from the specific images the model was run on.
-
-    Train targets are used (not test) so the reference is disjoint from the
-    scenes being scored, and because there are far more of them: 30-33k tiled
-    256x256 patches per split, which gives a much better conditioned 2048x2048
-    covariance than the 2940-6000 crops the paired mode can muster.
-
-    Cached per (split, encoding, n_crops, seed) so every arm of a split is
+    Cached per (split, encoding, n_crops, seed) so every method on a split is
     scored against the identical reference.
     """
     fam = reference_family(data_dir)
@@ -385,13 +347,7 @@ def run_region(args, pairs, region, extractor):
 
 
 def run_regions(args, pairs, regions, extractor):
-    """FID for several regions in ONE pass over the images.
-
-    Each image's prediction TIFF and GT .npy are ~9 MB, so reloading them per
-    region would triple the read volume over the network PVC (measured: 259 GB
-    across a full 65-arm sweep vs 92 GB sharing the pass). Masks for all
-    regions are derived from a single guidance load too.
-    """
+    """FID for several regions in ONE pass over the images."""
     encs = {r: (("pu" if r == "shadow" else "srgb") if args.encoding == "auto"
                 else args.encoding) for r in regions}
     st = {r: {"real": [], "fake": [], "n_img": 0, "n_skip_mask": 0,
@@ -576,7 +532,7 @@ def main():
     args.reference_list = None
     args.baseline = False
     args.mask_source = "recompute"
-    args.min_coverage = 0.02   # argparse default of the full version; unused
+    args.min_coverage = 0.02   # unused when region is "all"
 
     if not os.path.isabs(args.data_dir):
         args.data_dir = os.path.join(RD, args.data_dir)

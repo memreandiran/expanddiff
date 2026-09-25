@@ -33,26 +33,19 @@ general:
   image_size: 256
   is_linear: false  # true = linear-RGB pipeline, false = 8-bit sRGB pipeline.
                     # Controls viz gamma encoding and LPIPS input pre-processing.
-  clip_loss_weight: 0.0  # LEVEL 2. Spatial loss re-weighting toward clipped
-                    # regions: pixel weight = (1-w) + w*mask, so 0.0 is the old
-                    # uniform loss (bit-exact) and 1.0 trains only where the
-                    # input is saturated/crushed. Motivated by LEDiff, whose
-                    # published pipeline restores unclipped regions from the
-                    # input, making capacity spent there wasted. Pair with the
-                    # --blend post-process in metrics/align.py.
-  clip_loss_thr: 0.05  # width of the soft ramp, matching LEDiff's mask
-  clip_mask_channel: false  # LEVEL 3. Append the soft clip mask as a 4th
-                    # guidance channel so the model is told WHERE to
-                    # hallucinate. Oracle-free: the mask is computed from the
-                    # guidance alone, never from the target or a threshold.
+  clip_loss_weight: 0.0  # Spatial loss re-weighting toward clipped regions:
+                    # pixel weight = (1-w) + w*mask, so 0.0 is a uniform loss
+                    # and 1.0 trains only where the input is saturated/crushed.
+                    # Pair with the --blend post-process in metrics/align.py.
+  clip_loss_thr: 0.05  # width of the soft ramp
+  clip_mask_channel: false  # Append the soft clip mask as a 4th guidance
+                    # channel. The mask is computed from the guidance alone.
                     # Requires model.rgb_guidance_module.n_colors=4.
-  target_encoding: none  # none | pu21. "none" keeps the existing behaviour
-                    # exactly. "pu21" trains against perceptually-uniform
-                    # targets, which are bounded in [0,1] so the tanh head is
-                    # unchanged, and lets the model represent scene-referred
-                    # radiance (~17.6 stops) once decoded at inference.
-                    # Requires is_linear=true, and weight_logl1/weight_pul1=0
-                    # since a log or PU term on top of PU21 double-encodes.
+  target_encoding: none  # none | pu21. "none" trains against linear targets.
+                    # "pu21" trains against perceptually-uniform targets,
+                    # bounded in [0,1], and lets the model represent
+                    # scene-referred radiance once decoded at inference.
+                    # Requires is_linear=true and weight_logl1=weight_pul1=0.
 
 model:
   _target_: rawdiffusion.models.rawdiffusion.RAWDiffusionModel

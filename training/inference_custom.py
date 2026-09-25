@@ -1,11 +1,9 @@
 """Run a checkpoint over a folder of image files, with no ground truth required.
 
-This is the entry point that takes a checkpoint path directly, so it is the way
-to use a released checkpoint. `sample.py` instead rebuilds the checkpoint path
-from a training config and needs a preprocessed split.
+It takes a checkpoint path directly, so it works with a released checkpoint.
+`sample.py` instead needs a preprocessed split.
 
-Every released ExpandDiff checkpoint predicts a PU21-encoded target from linear
-guidance, so both flags below are required with them:
+Pass both flags below with every released ExpandDiff checkpoint:
 
   python training/inference_custom.py \
     --checkpoint checkpoints/expanddiff_p_150k.ckpt \
@@ -23,12 +21,12 @@ guidance, so both flags below are required with them:
                       wrong produces a plausible but wrongly-toned image, so the
                       script prints a warning when it disagrees with the
                       checkpoint. `checkpoints/MANIFEST.md` lists it per file.
-
-The bounded head is NOT a flag: whether the model ends in tanh is read from the
-checkpoint, so the unbounded ablations rebuild correctly without being asked.
   --input_is_linear   the input files are already linear; skip the conversion.
   --save_guidance     also write what the model was actually given, which is
                       what to look at when a result is unexpected.
+
+There is no flag for the bounded head: whether the model ends in tanh is read
+from the checkpoint, so the unbounded ablations rebuild correctly as they are.
 
 WHAT YOU GET, per input image:
 
@@ -49,9 +47,7 @@ image with no blown or crushed pixels is outside the training distribution and
 has little for the model to do.
 """
 
-# Make the repository root importable no matter where this is run from:
-# Python puts the SCRIPT's directory on sys.path, not the working directory, so
-# `python training/train.py` would otherwise fail to find `rawdiffusion`.
+# Make the repository root importable no matter where this is run from.
 import os as _os
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
@@ -151,8 +147,7 @@ def main():
     cfg.diffusion_val.timestep_respacing = args.timesteps
 
     # Architecture settings come from the checkpoint itself, so a checkpoint
-    # trained without the bounded head is not silently rebuilt with one. The
-    # config default would otherwise win and the error would be invisible.
+    # trained without the bounded head is rebuilt without it.
     ckpt_cfg = torch.load(args.checkpoint, map_location="cpu",
                           weights_only=False).get("hyper_parameters", {})
     ckpt_model = ckpt_cfg.get("model", {}) if isinstance(ckpt_cfg, dict) else {}
@@ -229,8 +224,7 @@ def main():
             guide = rgb_tensor[0].clamp(0, 1).cpu()
             if args.linear_model:
                 # Linear guidance is saved as a float32 TIFF to avoid
-                # quantization to uint8 (which destroys the shadow
-                # precision the model actually consumes).
+                # quantization to uint8.
                 save_float_tiff(
                     guide,
                     output_dir / f"{img_path.stem}_guidance_linear.tiff",

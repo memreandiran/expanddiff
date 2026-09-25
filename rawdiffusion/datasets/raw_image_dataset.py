@@ -21,13 +21,9 @@ class RGBImageDataset(Dataset):
     `target_encoding` optionally reparametrises the TARGET only:
       - "none" (default) -- the target is the stored linear value, unchanged.
       - "pu21"           -- the target becomes pu21(L), which is bounded in
-                            [0, 1] by construction. The tanh head then covers
-                            ~17.6 stops of scene-referred radiance instead of a
-                            display-referred [0, 1] image. Decode predictions
-                            with utils.pu21_decode at inference.
-    The guidance is never encoded: it is an 8-bit-derived LDR capture that is
-    already bounded, and re-curving it would change what the model sees as
-    "clipped" without buying any range.
+                            [0, 1]. Decode predictions with utils.pu21_decode
+                            at inference.
+    The guidance is never encoded.
     """
 
     def __init__(self, dataset_path, file_list, transforms=None,

@@ -1,29 +1,20 @@
-"""HDR-aware quality metrics.
+"""HDR-aware quality metrics, intended for the linear-RGB pipeline.
 
-Three new metrics intended for the linear-RGB pipeline:
+Includes:
 
 * ``PUPSNRMetric`` -- PSNR after Aydin et al. (2008) PU encoding.
-  Standard linear-space PSNR is dominated by errors in the bright
-  regions because most linear-RGB values are tiny and the absolute
-  squared error is largest where the magnitudes are largest. PU encoding
-  approximates the human contrast sensitivity function so that an
-  equal numerical error contributes roughly the same regardless of the
-  underlying luminance level.
 
 * ``PUSSIMMetric`` -- SSIM computed on PU-encoded inputs.
 
 * ``CosineDistanceMetric`` -- mean :math:`1 - \\cos(\\hat{x}_i, x_i)`
-  over per-pixel RGB direction. Designed (per ExpandNet,
-  Marnerides et al. 2018) to penalise colour casts in dark regions
-  that L1/L2 barely touch, because the absolute pixel magnitude is too
-  small for the linear-space loss to notice.
+  over per-pixel RGB direction, as in ExpandNet (Marnerides et al.
+  2018). Penalises colour casts, including in dark regions.
 
 PU encoding here uses the Aydin et al. (2008) logarithmic
 approximation:
     pu(L) = log10(318 * L + 1) / log10(319),    L in [0, 1].
 which maps relative linear luminance to a perceptually uniform range
-in [0, 1]. This is the form most commonly cited in HDR vision/graphics
-papers and matches what ExpandNet uses before reporting PSNR/SSIM.
+in [0, 1].
 """
 
 import torch
@@ -97,10 +88,8 @@ class PUSSIMMetric(BaseMetric):
 
 
 class PUMSSSIMMetric(BaseMetric):
-    """Multi-scale SSIM on PU-encoded inputs. Matches ExpandNet's
-    paper-reported MS-SSIM (computed after PU encoding). Requires images
-    of at least ~160 pixels per side -- fine for the d2/d4 test
-    resolutions used in this project."""
+    """Multi-scale SSIM on PU-encoded inputs. Requires images of at least
+    ~160 pixels per side."""
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -125,36 +114,21 @@ class PUMSSSIMMetric(BaseMetric):
 
 
 # --------------------------------------------------------------------------- #
-# PU21 (Mantiuk & Azimi 2021) -- the encoding the AIM 2025 ITM challenge ranks
-# on, and a DIFFERENT curve from the Aydin 2008 one used by the PU* metrics
-# above. Both are called "PU"; they are not interchangeable, so these are
-# reported as separate columns rather than replacing anything.
-#
-# CONVENTION, and the caveat that goes with any comparison to AIM 2025: our
-# pu21_encode normalises to [0, 1] with l_peak = 1000 cd/m^2, so PSNR is taken
-# against a peak of 1.0. Mantiuk's reference pu21_metric uses its own peak
-# convention on unnormalised PU units, so absolute values here will NOT line up
-# with the challenge's 29.22 dB figure until that convention is confirmed and
-# matched. What these ARE good for: comparing our own runs against each other
-# on the curve the field now ranks with, and -- for target_encoding=pu21 runs
-# -- reading almost exactly as PSNR on the training target.
+# PU21 (Mantiuk & Azimi 2021) -- a different curve from the Aydin 2008 one
+# used by the PU* metrics above. Both are called "PU"; they are not
+# interchangeable.
 # --------------------------------------------------------------------------- #
 class PU21PSNRMetric(BaseMetric):
     """PSNR on PU21-encoded values, in either of two conventions.
 
     convention="normalized" (default) -- pu21_encode to [0,1] with l_peak,
-        PSNR against peak 1.0. Self-consistent, and for target_encoding=pu21
-        runs it reads almost exactly as PSNR on the training target. This is
-        the basis to keep using for the LEDiff comparison so those numbers
-        stay on one scale.
-    convention="reference" -- matches gfxdisp/pu21 pu21_metric.m exactly:
-        absolute cd/m^2 clamped to [0.005, 10000], RAW encode, PSNR against
-        peak 256. Use this and only this when comparing to AIM 2025 or to any
-        published PU21-PSNR.
+        PSNR against peak 1.0.
+    convention="reference" -- as gfxdisp/pu21 pu21_metric.m: absolute cd/m^2
+        clamped to [0.005, 10000], raw encode, PSNR against peak 256. Use this
+        when comparing to published PU21-PSNR values.
 
-    The two differ by roughly a constant offset but not exactly, since the
-    normalised variant also clips at l_peak where the reference clips at
-    10000 -- so they cannot be converted into each other post hoc.
+    The two cannot be converted into each other, since the normalised variant
+    also clips at l_peak where the reference clips at 10000.
     """
 
     def __init__(self, *args, l_peak: float = 1000.0,
@@ -187,7 +161,7 @@ class PU21PSNRMetric(BaseMetric):
 
 
 class PU21SSIMMetric(BaseMetric):
-    """SSIM on PU21-encoded values -- the challenge's second ranking metric."""
+    """SSIM on PU21-encoded values."""
 
     def __init__(self, *args, l_peak: float = 1000.0,
                  convention: str = "normalized", **kwargs) -> None:
@@ -227,16 +201,9 @@ class PU21VSIMetric(BaseMetric):
     """VSI (Zhang et al. 2014, Visual Saliency-Induced index) on PU21-encoded
     values.
 
-    Why this exists: the SI-HDR benchmark paper (Hanji et al., SIGGRAPH '22,
-    §7.2) recommends exactly four metrics -- PU21-PSNR, **PU21-VSI**,
-    HDR-VDP-3 and PU21-PIQE -- and names PU21-VSI and HDR-VDP-3 as the two
-    best-performing against their subjective data. It also says explicitly
-    "We do not recommend using PU21-SSIM", which is what we had been reporting.
-
-    VSI comes from `piq`; it is not reimplemented here. Higher is better, and
-    the range is [0, 1] for both conventions because VSI is a similarity index
-    rather than an error measure -- so unlike PU21-PSNR/SSIM the `convention`
-    only changes the encoder's scale, not the output range.
+    VSI is computed with `piq`'s internals (see vsi_ref.py). Higher is better,
+    and the range is [0, 1] under both conventions: `convention` only changes
+    the encoder's scale, not the output range.
     """
 
     def __init__(self, *args, l_peak: float = 1000.0,
@@ -268,16 +235,10 @@ class PU21VSIMetric(BaseMetric):
                else pu21_encode)
         p = enc(pred.clamp(0, 1), self.l_peak)
         t = enc(target.clamp(0, 1), self.l_peak)
-        # RAW PU units, NOT rescaled. `pu21_metric.m` calls `m_vsi(P, T)` on the
-        # encoder's own output, which reaches 420 at a 1000 cd/m^2 peak, and
-        # `m_vsi.m` applies no rescaling: its similarity constants (1.27, 386,
-        # 130) are absolute. `piq.vsi` instead does `x = x * 255 / data_range`,
-        # so calling it with data_range = enc(1.0) = 420.1 compressed the signal
-        # by 0.607 while the constants stayed put -- pushing every similarity
-        # ratio toward 1 and reading VSI HIGH by up to +0.0049, with the bias
-        # GROWING with the error being measured. `vsi_raw_pu` is piq's body with
-        # those two rescale lines removed. See vsi_ref.py; verified against
-        # MATLAB R2024b running the reference m_vsi.m.
+        # PU units are passed without rescaling, as `pu21_metric.m` calls
+        # `m_vsi(P, T)` on the encoder's own output and `m_vsi.m` applies no
+        # rescaling. `vsi_raw_pu` is piq's VSI without its input rescaling;
+        # see vsi_ref.py.
         v = vsi_raw_pu(p, t, reduction="none")
         self.value += v.sum()
         self.count += p.size(0)
@@ -287,20 +248,16 @@ class PU21VSIMetric(BaseMetric):
 
 
 # --------------------------------------------------------------------------- #
-# mu-law tonemapped PSNR/SSIM -- the headline metric in the Kalantari lineage
-# (Kalantari & Ramamoorthi 2017) and what ExpoCM reports as PSNR-mu / SSIM-mu.
+# mu-law tonemapped PSNR/SSIM (Kalantari & Ramamoorthi 2017), also reported as
+# PSNR-mu / SSIM-mu.
 #
 #     T(H) = log(1 + mu*H) / log(1 + mu),   mu = 5000,  H in [0, 1]
 #
-# A THIRD curve alongside Aydin-PU and PU21. All three are "perceptual
-# encodings before PSNR" and none is interchangeable with the others, so they
-# are reported as separate columns.
+# A third curve alongside Aydin-PU and PU21; none of the three is
+# interchangeable with the others.
 #
-# NOTE on comparability: ExpoCM applies NO alignment before scoring. Matching
-# their numbers therefore requires matching their TARGET NORMALISATION too, not
-# just the metric -- our median-anchored targets are on a different absolute
-# scale than whatever HDR-EYE/HDR-REAL ship. Metric parity is necessary but not
-# sufficient.
+# Comparing with published PSNR-mu / SSIM-mu values also requires the same
+# target normalisation, not just the same metric.
 # --------------------------------------------------------------------------- #
 _MU = 5000.0
 

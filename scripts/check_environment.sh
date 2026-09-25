@@ -3,8 +3,7 @@
 #
 #   bash scripts/check_environment.sh
 #
-# Every metric family has its own dependencies, and some of them fail late or
-# quietly. This prints one line per family so you find out in seconds.
+# Every metric family has its own dependencies. This prints one line per family.
 
 PY=${PY:-python}
 ok=0; miss=0
@@ -44,7 +43,7 @@ if command -v "$OCT" >/dev/null 2>&1 || [ -x "$OCT" ]; then
   say "octave" "ok ($OCT)"
   [ -n "${OCTAVE_HOME:-}" ] || say "" "  note: some builds also need OCTAVE_HOME set"
 else
-  say "octave" "MISSING -- PU21-VSI, the +CRF columns and HDR-VDP-3 need it"
+  say "octave" "MISSING -- PU21-VSI, +CRF PU21-PSNR/VSI and HDR-VDP-3 need it"
   miss=$((miss+1))
 fi
 

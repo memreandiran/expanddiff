@@ -1,32 +1,18 @@
-"""PU21-PIQE: a NO-REFERENCE HDR quality metric, as reported by LEDiff.
-
-This is the one metric of LEDiff's that we can compute on a comparable basis.
-Their Table 1 reports HDR-VDP3, PU21-PIQE and three FIDs; HDR-VDP3 is a MATLAB
-toolbox with no maintained Python port, and their FIDs are on a different test
-set with different tone-mapping, so they are not comparable to ours. PIQE is
-no-reference, so it needs no ground truth and no shared reference distribution:
-a number computed here is directly comparable to the 48.46 (highlights) and
-43.37 (shadows) they publish.
+"""PU21-PIQE: a no-reference HDR quality metric.
 
 Lower is better. Roughly: <20 excellent, 20-35 good, 35-50 fair, >50 poor.
 
 Two stages.
 
-1. PU21 encoding (Mantiuk & Azimi 2021), the successor to the Aydin PU
-   encoding already used by the PU-PSNR/SSIM metrics here. It maps absolute
-   luminance to a perceptually uniform scale on which an equal numerical
-   difference is equally visible regardless of level. Needed because PIQE was
-   designed for 8-bit display-referred images and is meaningless applied to raw
-   linear values.
+1. PU21 encoding (Mantiuk & Azimi 2021). It maps absolute luminance to a
+   perceptually uniform scale on which an equal numerical difference is
+   equally visible regardless of level.
 
 2. PIQE (Venkatanath et al. 2015), a no-reference score built from block-wise
    distortion criteria on a mean-subtracted contrast-normalised (MSCN) map.
-   Deterministic, no learned weights, which is why it can be ported exactly
-   rather than approximated.
 
 `pyiqa` ships PIQE and is used when importable; the local implementation below
-is the fallback so this works without adding a dependency. The implementation
-used is recorded in the output so the two are never silently mixed.
+is the fallback. The implementation used is stored in `backend`.
 """
 
 import numpy as np
@@ -49,19 +35,16 @@ _PU21_YMIN = 0.005     # nits; below this the fit is not defined
 def pu21_encode(lin, l_peak=1000.0):
     """Linear RGB in [0,1] -> PU21 units, normalised to roughly [0,1].
 
-    `l_peak` is the display peak luminance the relative values are taken to
-    represent. 1000 cd/m^2 is a common HDR display assumption and is what makes
-    the encoding meaningful; the choice shifts all scores by a constant and so
-    must be held fixed across everything being compared.
+    `l_peak` is the display peak luminance, in cd/m^2, that the relative values
+    are taken to represent. It must be held fixed across everything being
+    compared.
     """
     p1, p2, p3, p4, p5, p6, p7 = _PU21
     y = torch.clamp(lin * l_peak, min=_PU21_YMIN)
     yp = torch.pow(y, p4)
     v = torch.clamp(p7 * (torch.pow((p1 + p2 * yp) / (1 + p3 * yp), p5) - p6),
                     min=0.0)
-    # Normalise so peak white maps to 1.0, since PIQE expects data in the range
-    # an 8-bit image occupies. The divisor depends only on l_peak, which is
-    # held fixed across everything being compared.
+    # Normalise so peak white maps to 1.0. The divisor depends only on l_peak.
     yq = float(l_peak) ** p4
     vmax = max(p7 * (((p1 + p2 * yq) / (1 + p3 * yq)) ** p5 - p6), 1e-8)
     return torch.clamp(v / vmax, 0.0, 1.0)
@@ -78,8 +61,7 @@ def _mscn(x, eps=1e-8):
     ax = torch.arange(k, dtype=x.dtype, device=x.device) - (k - 1) / 2
     g = torch.exp(-(ax ** 2) / (2 * sigma ** 2))
     g = g / g.sum()
-    # separable, but applied as two conv2d passes: the input here is always
-    # (N, 1, H, W) and conv1d rejects 4D, which is what broke this before
+    # separable, applied as two conv2d passes over the (N, 1, H, W) input
     gh = g.view(1, 1, 1, k)
     gv = g.view(1, 1, k, 1)
     pad = k // 2
@@ -101,8 +83,7 @@ def piqe(img, block=16, activity_thr=0.1, deg_thr=0.5):
     Blocks with enough local activity are scored for two artefact types,
     blockiness and Gaussian-noise-like distortion, and the final score is the
     mean over active blocks mapped to [0,100]. Blocks that are too flat carry
-    no information and are excluded, which is what makes it robust to large
-    uniform regions -- relevant here, since clipped areas are exactly that.
+    no information and are excluded.
     """
     if img.dim() == 2:
         img = img[None, None]
@@ -140,13 +121,11 @@ def piqe(img, block=16, activity_thr=0.1, deg_thr=0.5):
 
 
 class PU21PIQEMetric(BaseMetric):
-    """No-reference: `target` is accepted and ignored, so it drops into the
-    existing CollectionMetric interface unchanged.
+    """No-reference: `target` is accepted and ignored, so it fits the
+    CollectionMetric interface.
 
-    ARGUMENT ORDER MATTERS for this metric where it does not for the others.
-    CollectionMetric.update is (pred, target) and this reads the FIRST
-    argument. sample.py calls update(target_data, sample), i.e. swapped, which
-    is harmless for the symmetric metrics it uses but would make this score the
+    Argument order matters for this metric: it scores the first argument.
+    sample.py calls update(target_data, sample), which would make it score the
     ground truth. Callers must pass (pred, target)."""
 
     def __init__(self, l_peak=1000.0, min_value=0, max_value=1):

@@ -1,10 +1,9 @@
 """
-Linear-RGB variant of the HDR+ preprocessing pipeline.
+Linear-RGB preprocessing pipeline for HDR+.
 
 Both target and guidance are stored in *linear* sRGB (sRGB EOTF reversed),
 as float values in [0, 1]. The model trained on these will predict linear
-sRGB. sRGB gamma is only re-applied for visualization and saved as separate
-PNGs alongside the data.
+sRGB.
 
     target   = final.jpg, half-resized, linear-encoded
                (float in [0, 1])
@@ -17,7 +16,7 @@ The model learns: linear-clipped RGB  ->  linear-unclipped RGB.
 Per burst folder (must contain final.jpg):
     1. Load final.jpg as uint8 sRGB and resize to half resolution.
     2. Convert to linear via the sRGB EOTF.
-    3. Burst-level train/test split (so patches from one burst never leak):
+    3. Burst-level train/test split:
          - TRAIN burst: tile into non-overlapping patch_size x patch_size
            patches; for each patch, sample shadow_stops ~ U[shadow_min, shadow_max]
            and highlight_stops ~ U[hl_min, hl_max]. Apply linear clip + normalize.
@@ -35,7 +34,7 @@ Configurable stops ranges (via CLI flags):
 Usage:
     python current_pipeline_linear_RGB.py \\
         --dataset_root <hdrplus>/results_20171023 \\
-        --output_dir   data/hdrplus_linrgb_-7.1_-6.9_-1.1_-0.9 \\
+        --output_dir   data/<split> \\
         --patch_size   256 \\
         --shadow_stops -7.1 -6.9 \\
         --highlight_stops -1.1 -0.9 \\

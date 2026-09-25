@@ -3,16 +3,15 @@
 
   python metrics/crf_ref2_cells.py --self_check
   python metrics/crf_ref2_cells.py --split_dir <split> --condition <name> \
-      --arms a,b,c [--out_dir fid_logs/crf_ref2] [--no_vsi]
+      --arms a,b,c [--out_dir <dir>] [--no_vsi]
 
-Run --self_check first: it verifies PSNR and VSI against stored MATLAB R2024b
-values and exits nonzero on any mismatch. The cell writer refuses to run if it
-fails.
+--self_check verifies PSNR and VSI against stored MATLAB R2024b values and
+exits nonzero on any mismatch.
 
 VSI is computed by the reference m_vsi.m under Octave, so $PU21_M must point at
 a gfxdisp/pu21 checkout and $OCT_BIN at an octave-cli binary.
 
-Writes fid_logs/crf_ref2/crfref2_<cond>_<arm>.yaml.
+Writes <out_dir>/crfref2_<cond>_<arm>.yaml.
 """
 import argparse, os, subprocess, sys, tempfile
 import numpy as np, tifffile, torch, yaml
@@ -57,7 +56,7 @@ def hwc(a):
 
 
 def enc(nits_over_peak):
-    """RAW PU21 units. NO [0,1] clamp: encode's own [0.005, 10000] applies."""
+    """Raw PU21 units. No [0,1] clamp: the encoder's own [0.005, 10000] applies."""
     return pu21_encode_metric(torch.from_numpy(np.ascontiguousarray(nits_over_peak)), 1000.0)
 
 

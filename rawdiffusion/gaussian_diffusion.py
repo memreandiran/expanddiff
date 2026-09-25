@@ -15,16 +15,12 @@ from .models.nn import mean_flat
 
 
 def clip_soft_mask(guidance, thr=0.05):
-    """LEDiff's soft over-exposure mask, from their test_hdr_itm.py, extended to
+    """LEDiff's soft over-exposure mask (their test_hdr_itm.py), extended to
     cover the shadow end too.
 
-    guidance arrives in [-1, 1]; map to [0, 1] first. The mask is 1 where the
-    input is saturated (or crushed) and ramps to 0 over the top/bottom `thr` of
-    the range -- i.e. exactly where an ITM method must invent content.
-
-    ORACLE-FREE by construction: this reads only the guidance, never the target
-    or any clip threshold, so nothing here leaks information a deployed model
-    would not have.
+    `guidance` is in [-1, 1] and is mapped to [0, 1] first. The mask is 1 where
+    the input is saturated (or crushed) and ramps to 0 over the top/bottom
+    `thr` of the range.
     """
     g = (guidance + 1.0) * 0.5
     hi = ((g.amax(dim=1, keepdim=True) - 1.0 + thr) / thr).clamp(0.0, 1.0)
@@ -906,10 +902,8 @@ class GaussianDiffusion:
 
             # Optional spatial re-weighting toward clipped regions. With
             # clip_loss_weight=w, a pixel's weight is (1 - w) + w * mask, so
-            # w=0 is the old uniform behaviour (bit-exact) and w=1 trains ONLY
-            # on clipped pixels. The point is LEDiff's design: if a blend
-            # restores unclipped regions from the input at inference, capacity
-            # spent reconstructing them is wasted. See run_sihdr_blend.sh.
+            # w=0 weights all pixels equally and w=1 trains only on clipped
+            # pixels.
             _sw = None
             if clip_loss_weight > 0.0:
                 _g = model_kwargs.get("guidance_data") if model_kwargs else None

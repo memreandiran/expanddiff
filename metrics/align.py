@@ -14,8 +14,8 @@ scoring tools expect.
 
 --out_dir must be the `pred` directory itself, not its parent.
 
-Outputs are `<name>_generated_linear.tiff`, float32 linear, which every script
-below reads. Requires only numpy and tifffile.
+Outputs are `<name>_generated_linear.tiff`, float32 linear, which the scoring
+scripts read.
 """
 import argparse
 import glob
@@ -24,7 +24,7 @@ import os
 import numpy as np
 import tifffile
 
-# Only used to resolve RELATIVE --pred_dir / --data_dir / --out arguments.
+# Only used to resolve RELATIVE --raw_dir / --split_dir / --out_dir arguments.
 # Pass absolute paths and it is never consulted.
 ROOT = os.environ.get("EXPANDIFF_ROOT",
                       os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -63,17 +63,11 @@ def lediff_blend(pred_hdr, ldr_srgb, gt=None, preset="code"):
 
     The network output is used ONLY in over-exposed regions. Everywhere else the
     output is the input LDR raised to a fitted gamma and scaled by a fitted
-    exposure, i.e. a near-exact reconstruction. Scoring the raw network output
-    instead -- which we did originally -- understates LEDiff badly, because most
-    pixels of a published LEDiff result never pass through the diffusion model.
-
-    Their fit targets the network's own HDR on non-clipped pixels
-    (optimize_gamma_exp), so no ground truth is needed and the step stays
-    oracle-free -- confirmed by their supplementary S3: "we do not estimate the
-    exposure or the camera response curve" in the reconstruction itself.
+    exposure. The fit targets the network's own HDR on non-clipped pixels
+    (optimize_gamma_exp), so no ground truth is needed.
 
     Constants come from `preset` (see BLEND_PRESETS): "code" reproduces their
-    released script, "supp" reproduces their supplementary. They disagree.
+    released script, "supp" reproduces their supplementary.
     """
     from scipy.optimize import least_squares
 
@@ -117,27 +111,14 @@ def _square_resize(arr, out_h, out_w):
 
 
 def fit_align(pred, gt, guidance, mode):
-    """-> (aligned, params). Fitted only on pixels the guidance did NOT clip,
-    which is where the ground truth is genuinely informative about scale.
+    """-> (aligned, params). Fitted only on pixels the guidance did NOT clip.
 
-    `scale` and `gamma_scale` fit against the TARGET, so they touch ground
-    truth: they are an evaluation-time oracle (ORACLE_FREE_NOTES 2). That is
-    standard for scale-invariant metrics and is applied identically to every
-    arm, but it invites the objection that the ranking is an artefact of the
-    fit.
+    `scale` and `gamma_scale` fit against the TARGET, so they use ground truth.
 
-    `guidance_scale` is the oracle-free control for exactly that objection:
-    the same one-parameter least-squares scale, fitted against the GUIDANCE --
-    the model's own input -- instead of the target. Nothing the model could not
-    see at inference is used.
-
-    Its absolute values are NOT comparable to the `scale` numbers. The guidance
-    passed through a randomised camera response, so target/guidance on unclipped
-    pixels is not a constant (measured per-image IQR spread 0.39-5.6 across
-    splits); fitting to it lands in guidance units, not target units, and every
-    metric shifts. What it IS good for is the comparison: the same transform is
-    applied to every arm, so if the ordering survives, the GT-fitted alignment
-    was not doing the work.
+    `guidance_scale` is the same one-parameter least-squares scale, fitted
+    against the GUIDANCE -- the model's own input -- instead of the target, so
+    no ground truth is used. Its results land in guidance units, not target
+    units, so they are NOT comparable to the `scale` numbers.
     """
     m = ((guidance > 1e-6) & (guidance < 1 - 1e-6)).all(axis=-1)
     if m.sum() < 100:
@@ -175,10 +156,10 @@ def main():
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--align", default="scale",
                     choices=["none", "scale", "gamma_scale", "guidance_scale"],
-                    help="guidance_scale is the ORACLE-FREE control: same "
-                         "one-parameter fit, but against the guidance instead "
-                         "of the target. Comparable across arms, NOT "
-                         "comparable to the scale/gamma_scale numbers.")
+                    help="guidance_scale fits the same one-parameter gain "
+                         "against the guidance instead of the target (no "
+                         "ground truth); its scores are NOT comparable to the "
+                         "scale/gamma_scale numbers.")
     ap.add_argument("--file_list", default="HDRPlus_test.txt")
     ap.add_argument("--blend_preset", default="code",
                     choices=["code", "supp"],
