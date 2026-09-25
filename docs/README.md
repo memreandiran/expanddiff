@@ -12,7 +12,7 @@ dependencies: GitHub Pages serves `index.html` as-is.
 
 ## Filling in the links
 
-The remaining buttons in the header start disabled (Code and Checkpoints are live). Each is marked with a
+The arXiv and Paper buttons start disabled (Supplementary, Code and Checkpoints are live). Each is marked with a
 `PLACEHOLDER` comment in `index.html`. To activate one, set its `href` and
 remove `disabled` from its `class`:
 
@@ -20,7 +20,6 @@ remove `disabled` from its `class`:
 |---|---|
 | arXiv | `https://arxiv.org/abs/XXXX.XXXXX` |
 | Paper | `paper.pdf`, uploaded next to `index.html` |
-| Supplementary | `supplementary.pdf`, uploaded next to `index.html` |
 
 ## Local preview
 

@@ -11,8 +11,7 @@ Pass absolute paths. `--device` defaults to `cuda`; pass `--device cpu` off-GPU.
 
 ## 1. Align
 
-Single-image HDR expansion determines radiance only up to a global scale, so
-every method is calibrated the same way before scoring:
+Align every method the same way before scoring:
 
     python metrics/align.py --raw_dir <predictions> --split_dir <split> \
         --file_list <prefix>.txt --align scale --out_dir <arm>_scale/pred
@@ -62,13 +61,10 @@ For the corrected basis, write corrected tiffs first:
         --a <arm_a>_scale/pred --b <arm_b>_scale/pred \
         --target_dir <split>/<prefix>_target
 
-Use this rather than comparing means: per-image differences are heavy-tailed, so
-sub-dB gaps between means are routinely not significant. It prints the mean, a
-95% confidence interval, the win rate and the median.
+It prints the mean, a 95% confidence interval, the win rate and the median.
 
 ## Note on the input
 
 Predictions compared against other methods should be sampled from the 8-bit twin
 of the split (`preprocessing/make_q8_split.py`) and aligned and scored against
-the original. Otherwise a model reading float32 guidance gets precision the
-methods fed the `ldr_input` PNGs never had.
+the original.

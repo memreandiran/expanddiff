@@ -71,8 +71,7 @@ the checkpoint, and torch >= 2.6 refuses to unpickle it by default, with an
 
 ## Exactly what each checkpoint is
 
-Every field below was read out of that run's own training log or its stored
-config, not transcribed from notes. All seven share `seed 0`, `is_linear true`,
+All seven share `seed 0`, `is_linear true`,
 `lr_scheduler cosine`, `L1 + L2` weights 1.0/1.0 (no log-L1 except D), and
 DDIM-24 sampling.
 
