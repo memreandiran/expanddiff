@@ -44,6 +44,7 @@ done
 if command -v sha256sum >/dev/null 2>&1; then
   echo
   while read -r sum name; do
-    [ -f "$name" ] && echo "$sum  $name" | sha256sum -c -
+    [ -f "$name" ] || continue
+    echo "$sum  $name" | sha256sum -c -
   done < SHA256SUMS.txt
 fi

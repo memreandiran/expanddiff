@@ -112,10 +112,9 @@ def sample_boxes(h, w, n, crop, rng, mask=None, min_coverage=0.02, oversample=40
 
 
 class InceptionFeatures:
-    """2048-d pool features. Prefers torch-fidelity's TF-ported weights (the
-    canonical FID network); falls back to torchvision's inception_v3, which is
-    self-consistent but on a different weight set -- so the extractor name is
-    recorded in the output and numbers from the two must never be mixed."""
+    """2048-d pool features from torch-fidelity's TF-ported Inception weights,
+    the canonical FID network. There is no fallback: FID on any other network is
+    not comparable."""
 
     def __init__(self, device="cuda"):
         import torch
@@ -127,37 +126,23 @@ class InceptionFeatures:
                 FeatureExtractorInceptionV3,
             )
 
-            self.net = FeatureExtractorInceptionV3(
+            net = FeatureExtractorInceptionV3(
                 "inception-v3-compat", features_list=["2048"]
-            ).to(device).eval()
-            self.kind = "torch-fidelity-inception-v3-compat"
-            self._fwd = self._fwd_fidelity
+            )
         except Exception as exc:  # noqa: BLE001
-            print(f"[warn] torch-fidelity unavailable ({exc.__class__.__name__}); "
-                  "falling back to torchvision inception_v3. Numbers are "
-                  "self-consistent but not canonical FID.", file=sys.stderr)
-            import torchvision
-
-            net = torchvision.models.inception_v3(weights="IMAGENET1K_V1",
-                                                  aux_logits=True)
-            net.fc = torch.nn.Identity()
-            self.net = net.to(device).eval()
-            self.kind = "torchvision-inception-v3-IMAGENET1K_V1"
-            self._fwd = self._fwd_torchvision
+            raise SystemExit(
+                f"[error] cannot load torch-fidelity's Inception "
+                f"({exc.__class__.__name__}: {exc}). Install torch-fidelity and "
+                f"make sure its weights can be downloaded or are cached under "
+                f"$TORCH_HOME.")
+        self.net = net.to(device).eval()
+        self.kind = "torch-fidelity-inception-v3-compat"
+        self._fwd = self._fwd_fidelity
         for p in self.net.parameters():
             p.requires_grad_(False)
 
     def _fwd_fidelity(self, u8):
         return self.net(u8)[0].double()
-
-    def _fwd_torchvision(self, u8):
-        torch = self.torch
-        x = u8.float() / 255.0
-        x = torch.nn.functional.interpolate(x, size=(299, 299), mode="bilinear",
-                                            align_corners=False)
-        mean = torch.tensor([0.485, 0.456, 0.406], device=x.device).view(1, 3, 1, 1)
-        std = torch.tensor([0.229, 0.224, 0.225], device=x.device).view(1, 3, 1, 1)
-        return self.net((x - mean) / std).double()
 
     def __call__(self, patches_u8, batch_size=50):
         """patches_u8: (N, H, W, 3) uint8 -> (N, 2048) float64 numpy."""

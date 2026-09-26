@@ -3,7 +3,7 @@
 scoring tools expect.
 
   python metrics/align.py --raw_dir <model output> --split_dir <split> \
-      --align scale --out_dir <arm>_scale/pred
+      --file_list <prefix>.txt --align scale --out_dir <arm>_scale/pred
 
   --align none          no calibration
   --align scale         one parameter: s minimising ||s*pred - gt|| over pixels

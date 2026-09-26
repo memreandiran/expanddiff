@@ -86,7 +86,7 @@ DDIM-24 sampling.
 | linear, no tanh | `scenehdr_pct3_512` | linear | **no** | 32 | 2e-4 | 150k |
 
 The `data` column is the split name stored in each checkpoint: `scenehdr_pct3_512` is
-built by `preprocessing/run_scenehdr_pct_build.sh`, `scenehdr_c95_512` by
+built by `preprocessing/run_scenehdr_pct_build.sh` (written to `data/scenehdr_pct_512` by default), `scenehdr_c95_512` by
 `preprocessing/run_scenehdr_c95_build.sh`, `scenehdr_512` by `scenehdr_preprocess.py
 --degradation lediff --exposures all`, and D's split by
 `preprocessing/current_pipeline_linear_RGB.py`.

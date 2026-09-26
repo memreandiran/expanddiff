@@ -8,6 +8,7 @@ Run from the repository root, after building a split with the scripts in
       dataset.train.data_dir=data/scenehdr_pct_512 \
       dataset.val.data_dir=data/scenehdr_pct_512 \
       dataset.train.file_list=SceneHDR_train.txt \
+      dataset.val.file_list=SceneHDR_train.txt \
       dataset.train.batch_size=32 general.max_steps=150000 \
       general.lr=2e-4 general.lr_scheduler=cosine general.seed=0 \
       general.suffix=<name> general.check_val_every_n_epoch=10

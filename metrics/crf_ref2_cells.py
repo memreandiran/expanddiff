@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Corrected (+CRF) PU21-PSNR and PU21-VSI, on the benchmark's own convention.
 
-  python metrics/crf_ref2_cells.py --self_check
   python metrics/crf_ref2_cells.py --split_dir <split> --condition <name> \
-      --arms a,b,c [--out_dir <dir>] [--no_vsi]
+      --arms a,b,c [--pred_root <dir>] [--out_dir <dir>] [--no_vsi]
 
---self_check verifies PSNR and VSI against stored MATLAB R2024b values and
+--self_check verifies PSNR and VSI against MATLAB R2024b values computed on the
+authors' stored ExpandDiff-P predictions at C_p, which are not distributed, and
 exits nonzero on any mismatch.
 
 VSI is computed by the reference m_vsi.m under Octave, so $PU21_M must point at
@@ -117,6 +117,13 @@ def score(split_dir, arm, file_list, want_vsi=True, pred_root=None):
 
 def self_check(split_dir):
     print("SELF-CHECK against MATLAB R2024b (arm scpct150k_q8_scale at C_p)")
+    pdir = os.path.join(split_dir, "scpct150k_q8_scale", "pred")
+    missing = [s for s in MATLAB_REF
+               if not os.path.exists(os.path.join(pdir, f"{s}_generated_linear.tiff"))]
+    if missing:
+        print(f"  needs the stored ExpandDiff-P predictions at C_p in {pdir}, which "
+              f"are not distributed with this repository")
+        return 2
     tmp = tempfile.mkdtemp()
     ok = True
     for sid, (want_p, want_v) in MATLAB_REF.items():

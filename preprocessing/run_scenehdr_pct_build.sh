@@ -40,6 +40,9 @@ CLIP_REPEATS=${CLIP_REPEATS:-3}
 CAPTURE=${CAPTURE:-none}
 OUT=${OUT:-$ROOT/data/scenehdr_pct_512}
 
+# Relative DATASETS_DIR and OUT are taken from where the script is run.
+case "$DS" in /*) ;; *) DS=$PWD/$DS ;; esac
+case "$OUT" in /*) ;; *) OUT=$PWD/$OUT ;; esac
 cd "$HERE" || exit 1
 command -v "$PY" >/dev/null 2>&1 || [ -x "$PY" ] || { echo "no interpreter: $PY"; exit 1; }
 

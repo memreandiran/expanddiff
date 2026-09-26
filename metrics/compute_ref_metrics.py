@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Reference metrics for a directory of saved predictions.
 
-Scores PU21-PSNR, PU21-VSI, PU21-SSIM/MS-SSIM, PSNR, SSIM, LPIPS, MSE, Pearson
-and cosine distance for a folder of `<name>_generated_linear.tiff` against a
+Scores PU21-PSNR, PU21-SSIM/MS-SSIM, PSNR, SSIM, LPIPS, MSE, Pearson and
+cosine distance for a folder of `<name>_generated_linear.tiff` against a
 preprocessed split, and writes them as yaml.
 
   python metrics/compute_ref_metrics.py --device cpu --linear \
@@ -14,8 +14,8 @@ double-warp sRGB input.
 --device defaults to cuda; pass cpu explicitly on a machine without a GPU.
 
 `pu21_psnr_ref` is PU21-PSNR on the gfxdisp/pu21 reference convention. For
-CRF-corrected PU21-PSNR and PU21-VSI use metrics/crf_ref2_cells.py; for PU21-VSI
-from the reference m_vsi.m use metrics/vsi_ref_cells.py.
+PU21-VSI use metrics/vsi_ref_cells.py, for PU21-PIQE metrics/piqe_ref_cells.py,
+and for the CRF-corrected columns metrics/crf_ref2_cells.py.
 
 Relative paths are resolved against $EXPANDIFF_ROOT; absolute paths bypass that.
 """
@@ -41,12 +41,10 @@ from rawdiffusion.evaluation.metrics import (
     PearsonMetric,
     PSNRMetric,
     PUMSSSIMMetric,
-    PU21PIQEMetric,
     MuLawPSNRMetric,
     MuLawSSIMMetric,
     PU21PSNRMetric,
     PU21SSIMMetric,
-    PU21VSIMetric,
     PUPSNRMetric,
     PUSSIMMetric,
     SSIMMetric,
@@ -91,10 +89,6 @@ def main():
     ap.add_argument("--linear", action="store_true", default=True,
                     help="inputs are linear-RGB, so emit the PU metrics")
     ap.add_argument("--srgb", dest="linear", action="store_false")
-    ap.add_argument("--l_peak", type=float, default=1000.0,
-                    help="display peak luminance in nits assumed by the PU21 "
-                         "encoding. Shifts all PU21-PIQE scores by a constant, "
-                         "so it must be identical across everything compared.")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 
@@ -117,21 +111,10 @@ def main():
         metrics_dict["pu21_ssim"] = PU21SSIMMetric()
         metrics_dict["pu21_psnr_ref"] = PU21PSNRMetric(convention="reference")
         metrics_dict["pu21_ssim_ref"] = PU21SSIMMetric(convention="reference")
-        try:
-            _vsi = PU21VSIMetric()
-            _d = torch.rand(1, 3, 64, 64)
-            _vsi.update(_d, _d)
-            assert abs(float(_vsi.compute()) - 1.0) < 1e-4, "VSI(x,x) != 1"
-            _vsi.reset()
-            metrics_dict["pu21_vsi"] = _vsi
-        except Exception as exc:  # noqa: BLE001
-            print(f"[warn] PU21-VSI skipped: {type(exc).__name__}: {exc}",
-                  file=sys.stderr)
         metrics_dict["mu_psnr"] = MuLawPSNRMetric()
         metrics_dict["mu_ssim"] = MuLawSSIMMetric()
         metrics_dict["pu_ssim"] = PUSSIMMetric()
         metrics_dict["pu_ms_ssim"] = PUMSSSIMMetric()
-        metrics_dict["pu21_piqe"] = PU21PIQEMetric(l_peak=args.l_peak)
     coll = CollectionMetric(metrics_dict)
     coll.reset()
 
@@ -171,9 +154,6 @@ def main():
     res["n_images"] = n
     if skipped:
         res["n_skipped"] = skipped
-    if "pu21_piqe" in metrics_dict:
-        res["pu21_piqe_backend"] = metrics_dict["pu21_piqe"].backend
-        res["pu21_l_peak"] = args.l_peak
 
     out = args.out
     if out is None:
@@ -192,9 +172,9 @@ def main():
 
     print(f"\n{n} images" + (f", {skipped} skipped" if skipped else ""))
     for k in ("pu_psnr", "pu_ssim", "pu_ms_ssim", "pu21_psnr", "pu21_ssim",
-              "pu21_psnr_ref", "pu21_ssim_ref", "pu21_vsi",
+              "pu21_psnr_ref", "pu21_ssim_ref",
               "mu_psnr", "mu_ssim",
-              "pu21_piqe", "psnr", "ssim",
+              "psnr", "ssim",
               "lpips", "mse", "pearson", "cosine_distance"):
         if k in res and isinstance(res[k], (int, float)):
             print(f"  {k:16s} {res[k]:.4f}")

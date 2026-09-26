@@ -16,7 +16,7 @@ Pass both flags below with every released ExpandDiff checkpoint:
                       and predictions come back linear. Required for every
                       released checkpoint.
   --target_encoding   must match how the checkpoint was trained: `pu21` for
-                      ExpandDiff-P, ExpandDiff-B and the PU21 ablation, `none`
+                      ExpandDiff-P, -B, -S and the PU21 ablation, `none`
                       for ExpandDiff-D and the two linear ablations. Getting it
                       wrong produces a plausible but wrongly-toned image, so the
                       script prints a warning when it disagrees with the
@@ -92,12 +92,18 @@ def pad_to_multiple(tensor, multiple=64):
 
 
 def load_rgb(path):
-    """Load an image as uint8 sRGB (H, W, 3)."""
+    """Load an image as float32 RGB in [0, 1], (H, W, 3), in its stored encoding.
+    8- and 16-bit files are divided by their full scale; float files are read
+    as values in [0, 1]."""
     img = imageio.imread(str(path))
-    if img.dtype == np.uint16:
-        img = (img.astype(np.float32) / 65535.0 * 255.0).astype(np.uint8)
-    elif img.dtype != np.uint8:
-        img = np.clip(img, 0, 255).astype(np.uint8)
+    if img.dtype == np.uint8:
+        img = img.astype(np.float32) / 255.0
+    elif img.dtype == np.uint16:
+        img = img.astype(np.float32) / 65535.0
+    elif np.issubdtype(img.dtype, np.floating):
+        img = np.clip(np.nan_to_num(img.astype(np.float32)), 0.0, 1.0)
+    else:
+        raise ValueError(f"unsupported pixel type {img.dtype}")
     if img.ndim == 2:
         img = np.stack([img] * 3, axis=-1)
     elif img.shape[2] == 4:
@@ -135,7 +141,8 @@ def main():
                              "wrong silently produces a wrongly-toned image.")
     parser.add_argument("--input_is_linear", action="store_true",
                         help="Only meaningful with --linear_model: if set, the input "
-                             "PNG is already linear (skip the sRGB->linear conversion).")
+                             "files are already linear, e.g. float TIFFs (skip the "
+                             "sRGB->linear conversion).")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -210,11 +217,11 @@ def main():
                 )
 
         rgb_tensor = (
-            torch.from_numpy(rgb.astype(np.float32) / 255.0)
+            torch.from_numpy(np.ascontiguousarray(rgb))
             .permute(2, 0, 1)
             .unsqueeze(0)
             .cuda()
-        )  # [0, 1] sRGB-encoded (PNG values, native form)
+        )  # [0, 1], in the file's own encoding
 
         # Convert input to whatever space the model was trained on.
         if args.linear_model and not args.input_is_linear:

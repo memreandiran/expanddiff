@@ -91,6 +91,7 @@ and Fairchild (<http://markfairchild.org/HDR.html>) — then train:
         dataset.train.data_dir=data/scenehdr_pct_512 \
         dataset.val.data_dir=data/scenehdr_pct_512 \
         dataset.train.file_list=SceneHDR_train.txt \
+        dataset.val.file_list=SceneHDR_train.txt \
         dataset.train.batch_size=32 general.max_steps=150000 \
         general.lr=2e-4 general.lr_scheduler=cosine general.seed=0 \
         general.suffix=my_run general.check_val_every_n_epoch=10
@@ -114,6 +115,7 @@ runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
 
     # 1. preprocess: HDR sources -> training pairs
     python preprocessing/scenehdr_preprocess.py --dataset_root <hdr dir> [--panorama] \
+        --tag <source name> \
         --output_dir data/<split> --size 512 512 --degradation percentile \
         --clip_pct_low 0 10 --clip_pct_high 0 30 --clip_repeats 3 [--append]
     #    (ExpandDiff-S: --degradation lediff --exposures all, without the clip flags)
@@ -122,7 +124,8 @@ runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
     python training/train.py general.is_linear=true general.target_encoding=pu21 \
         general.weight_logl1=0.0 general.weight_pul1=0.0 \
         dataset.train.data_dir=data/<split> dataset.val.data_dir=data/<split> \
-        dataset.train.file_list=<prefix>.txt dataset.train.batch_size=32 \
+        dataset.train.file_list=<prefix>.txt dataset.val.file_list=<prefix>.txt \
+        dataset.train.batch_size=32 \
         general.max_steps=150000 general.lr=2e-4 general.lr_scheduler=cosine \
         general.seed=0 general.suffix=<name> general.check_val_every_n_epoch=10
 
@@ -147,7 +150,7 @@ runs. To sample from a checkpoint, pass `checkpoint_path=<file>.ckpt` to
 
     # 4. align the predictions
     python metrics/align.py --raw_dir <predictions> --split_dir <test split> \
-        --align scale --out_dir <arm>_scale/pred
+        --file_list <prefix>.txt --align scale --out_dir <arm>_scale/pred
 
     # 5. score
     python metrics/compute_ref_metrics.py --device cpu --linear \

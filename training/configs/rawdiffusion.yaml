@@ -1,7 +1,6 @@
 defaults:
   - dataset: hdrplus_linrgb
   - model/rgb_guidance_module: edsr # edsr
-  - override hydra/launcher: slurm_rich
   - _self_
   
 general:
@@ -91,11 +90,3 @@ diffusion_val:
   rescale_timesteps: ${diffusion.rescale_timesteps}
   rescale_learned_sigmas: ${diffusion.rescale_learned_sigmas}
 
-
-hydra:
-  launcher:
-    gres: gpu:1 
-    mem_gb: 12
-    cpus_per_task: 6
-    timeout_min: 1440
-    partition: gpu_normal
