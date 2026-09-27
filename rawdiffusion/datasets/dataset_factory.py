@@ -18,17 +18,9 @@ def create_dataset(
     patch_size=256,
     max_items=None,
     num_workers=8,
-    target_variant=None,
-    shadow_stops=None,
-    highlight_stops=None,
-    return_all=False,
-    absolute_scale=True,
     target_encoding="none",
     **_ignored,
 ):
-    """`target_variant` switches to BracketRGBImageDataset, which ignores the
-    stored guidance and synthesises L0 / L- / L+ from the unclipped target (see
-    bracket_ops.py). Leave it None for the standard (target, guidance) loader."""
     if not data_dir:
         raise ValueError("unspecified data directory")
 
@@ -44,31 +36,12 @@ def create_dataset(
         name, ext = os.path.splitext(file_list)
         file_list = f"{name}_{max_items}_{seed}{ext}"
 
-    if target_variant:
-        if shadow_stops is None or highlight_stops is None:
-            raise ValueError("target_variant requires shadow_stops and "
-                             "highlight_stops")
-        from .bracket_image_dataset import BracketRGBImageDataset
-
-        dataset = BracketRGBImageDataset(
-            file_list=file_list,
-            dataset_path=data_dir,
-            transforms=transforms,
-            shadow_stops=tuple(shadow_stops),
-            highlight_stops=tuple(highlight_stops),
-            target_variant=target_variant,
-            is_train=is_train,
-            return_all=return_all,
-            absolute_scale=absolute_scale,
-            target_encoding=target_encoding,
-        )
-    else:
-        dataset = RGBImageDataset(
-            file_list=file_list,
-            dataset_path=data_dir,
-            transforms=transforms,
-            target_encoding=target_encoding,
-        )
+    dataset = RGBImageDataset(
+        file_list=file_list,
+        dataset_path=data_dir,
+        transforms=transforms,
+        target_encoding=target_encoding,
+    )
 
     if permutate_once:
         from .dataset_wrapper import PermutedDataset

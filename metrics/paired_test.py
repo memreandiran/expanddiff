@@ -40,12 +40,12 @@ def pu(x):
     return np.log10(318.0 * np.clip(x, 1e-8, 1.0) + 1.0) / _PU_DENOM
 
 
-_PU21_P = [0.353487901, 0.3735252458, 8.277049286e-05, 0.9062562627,
-           0.09150803491, 0.9099517204, 596.3148142]
+_PU21_P = [0.353487901, 0.3734658629, 8.277049286e-05, 0.9062562627,
+           0.09150303166, 0.9099517204, 596.3148142]
 
 
 def pu21(x, l_peak=1000.0):
-    """Mantiuk 2021 PU21 encoding.
+    """Mantiuk 2021 PU21 encoding, banding_glare parameters.
 
     The PSNR peak constant is omitted: a peak term enters both scores of a pair
     identically and cancels in the paired difference A-B.

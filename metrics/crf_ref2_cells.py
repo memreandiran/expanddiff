@@ -4,10 +4,6 @@
   python metrics/crf_ref2_cells.py --split_dir <split> --condition <name> \
       --arms a,b,c [--pred_root <dir>] [--out_dir <dir>] [--no_vsi]
 
---self_check verifies PSNR and VSI against MATLAB R2024b values computed on the
-authors' stored ExpandDiff-P predictions at C_p, which are not distributed, and
-exits nonzero on any mismatch.
-
 VSI is computed by the reference m_vsi.m under Octave, so $PU21_M must point at
 a gfxdisp/pu21 checkout and $OCT_BIN at an octave-cli binary.
 
@@ -24,7 +20,7 @@ sys.path.insert(0, ROOT)          # so `rawdiffusion` imports from the repo root
 from rawdiffusion.utils import PU21_PEAK, pu21_encode_metric  # noqa: E402
 from sihdr_crf_correct_ref import correct as crf_correct      # noqa: E402
 
-PU21_M = os.environ.get("PU21_M", os.path.join(ROOT, "tools", "pu21_matlab"))
+PU21_M = os.environ.get("PU21_M", "")
 # Octave: $OCT_BIN, else whatever is on PATH. Some builds (conda-forge
 # among them) also need $OCTAVE_HOME; when it is not already set we derive
 # it from the binary, which is correct for a prefix install.
@@ -44,11 +40,6 @@ for i=1:numel(f)
 end
 fclose(fid);
 """
-
-MATLAB_REF = {"001": (42.59198934, 0.99951212),
-              "008": (33.57275559, 0.99371936),
-              "175": (27.75958496, 0.98524220)}
-
 
 def hwc(a):
     a = np.asarray(a, np.float32)
@@ -115,69 +106,26 @@ def score(split_dir, arm, file_list, want_vsi=True, pred_root=None):
             float(np.mean(over)) if over else None)
 
 
-def self_check(split_dir):
-    print("SELF-CHECK against MATLAB R2024b (arm scpct150k_q8_scale at C_p)")
-    pdir = os.path.join(split_dir, "scpct150k_q8_scale", "pred")
-    missing = [s for s in MATLAB_REF
-               if not os.path.exists(os.path.join(pdir, f"{s}_generated_linear.tiff"))]
-    if missing:
-        print(f"  needs the stored ExpandDiff-P predictions at C_p in {pdir}, which "
-              f"are not distributed with this repository")
-        return 2
-    tmp = tempfile.mkdtemp()
-    ok = True
-    for sid, (want_p, want_v) in MATLAB_REF.items():
-        pp = os.path.join(split_dir, "scpct150k_q8_scale", "pred", f"{sid}_generated_linear.tiff")
-        tp = os.path.join(split_dir, "SIHDR_test_target", f"{sid}.npy")
-        pred, gt = hwc(tifffile.imread(pp)), hwc(np.load(tp))
-        It, _ = crf_correct(pred, gt)
-        P, T = enc(It), enc(gt)
-        got_p = 10.0 * np.log10(PU21_PEAK ** 2 / float(((P - T) ** 2).mean()))
-        savemat(os.path.join(tmp, f"{sid}.mat"),
-                {"P": P.numpy().astype(np.float64), "T": T.numpy().astype(np.float64)}, format="5")
-        dp = abs(got_p - want_p)
-        print(f"  {sid} PSNR got {got_p:.8f} want {want_p:.8f}  d {dp:.2e}  "
-              f"{'OK' if dp < 1e-5 else 'FAIL'}")
-        ok &= dp < 1e-5
-    csv = os.path.join(tmp, "out.csv"); mf = os.path.join(tmp, "run.m")
-    open(mf, "w").write(OCT_SCRIPT)
-    env = dict(os.environ, PU21_M=PU21_M, PAIRS=tmp, OUT_CSV=csv,
-               OCTAVE_HOME=_OCT_HOME)
-    subprocess.run([OCT, mf], env=env, capture_output=True, text=True)
-    if os.path.exists(csv):
-        for l in open(csv).read().splitlines()[1:]:
-            sid, v = l.split(",")
-            want = MATLAB_REF[sid][1]
-            d = abs(float(v) - want)
-            print(f"  {sid} VSI  got {float(v):.8f} want {want:.8f}  d {d:.2e}  "
-                  f"{'OK' if d < 5e-5 else 'FAIL'}")
-            ok &= d < 5e-5
-    else:
-        print("  !! octave produced no VSI"); ok = False
-    print("SELF-CHECK PASS" if ok else "SELF-CHECK FAILED")
-    return 0 if ok else 1
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split_dir")
     ap.add_argument("--condition")
     ap.add_argument("--arms")
     ap.add_argument("--file_list", default="SIHDR_test.txt")
-    ap.add_argument("--out_dir", default="fid_logs/crf_ref2")
+    ap.add_argument("--out_dir", default="crf")
     ap.add_argument("--no_vsi", action="store_true")
-    ap.add_argument("--self_check", action="store_true")
     ap.add_argument("--pred_root", default=None,
                     help="directory holding <arm>/pred (default: --split_dir)")
     a = ap.parse_args()
 
-    if a.self_check:
-        sd = a.split_dir or os.path.join(ROOT, "lediff_eval/sihdr512_pctclip/cp")
-        return self_check(sd)
     for req in ("split_dir", "condition", "arms"):
         if not getattr(a, req):
             raise SystemExit(f"[error] --{req} required")
 
+    if not a.no_vsi and not os.path.isfile(os.path.join(PU21_M, "m_vsi.m")):
+        print("  $PU21_M does not hold gfxdisp/pu21's m_vsi.m: computing the "
+              "+CRF PU21-PSNR only", file=sys.stderr)
+        a.no_vsi = True
     os.makedirs(a.out_dir, exist_ok=True)
     failed = []
     for arm in [x.strip() for x in a.arms.split(",") if x.strip()]:

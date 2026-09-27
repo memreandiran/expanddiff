@@ -242,10 +242,8 @@ def reference_family(data_dir):
 
 def reference_indices(data_dir, source):
     """Index files feeding the domain reference. source='all' uses every split
-    available (train + test; REED also has dev), source='train' only train."""
+    available (train + test), source='train' only train."""
     fams = (("HDRPlus_train.txt", "HDRPlus_test.txt"),
-            ("REED_train.txt", "REED_dev.txt", "REED_test.txt"),
-            ("Fairchild_test.txt",),
             ("SIHDR_test.txt",))
     for fam in fams:
         found = [f for f in fam if os.path.exists(os.path.join(data_dir, f))]
@@ -456,10 +454,7 @@ def _finalize(args, region, encoding, s, extractor, reference="paired"):
                   f"{np.median(cov):.5f}). These crops are mostly UNCLIPPED "
                   f"content, so this FID does not measure hallucination quality. "
                   f"This split has too little {region} clipping to support a "
-                  f"region-restricted FID -- pick a split whose stops actually "
-                  f"clip that end (e.g. shadow: hdrplus_linrgb_full_-12_-{{1,2,4}}_0_0_d4; "
-                  f"highlight: any of the FiveK/HDR+ splits with a nonzero "
-                  f"highlight clip).", file=sys.stderr)
+                  f"region-restricted FID.", file=sys.stderr)
 
     return {
         "fid": round(fid, 4),
@@ -492,8 +487,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data_dir", required=True,
-                    help="preprocessed split, e.g. data/fivek_linrgb_-12_-8_-4_0_d4")
-    ap.add_argument("--file_list", default="HDRPlus_test.txt")
+                    help="preprocessed split, e.g. data/c95")
+    ap.add_argument("--file_list", default="SIHDR_test.txt")
     ap.add_argument("--pred_dir", required=True,
                     help="dir with <name>_generated_linear.tiff")
     ap.add_argument("--crops_per_image", type=int, default=60)

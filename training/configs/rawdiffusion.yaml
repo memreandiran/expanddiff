@@ -35,7 +35,6 @@ general:
   clip_loss_weight: 0.0  # Spatial loss re-weighting toward clipped regions:
                     # pixel weight = (1-w) + w*mask, so 0.0 is a uniform loss
                     # and 1.0 trains only where the input is saturated/crushed.
-                    # Pair with the --blend post-process in metrics/align.py.
   clip_loss_thr: 0.05  # width of the soft ramp
   clip_mask_channel: false  # Append the soft clip mask as a 4th guidance
                     # channel. The mask is computed from the guidance alone.

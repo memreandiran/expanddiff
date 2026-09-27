@@ -18,8 +18,8 @@ Runs on CPU only. Compare only scores computed the same way.
 import argparse, os, re, sys
 import numpy as np, tifffile, torch
 
-_PU21 = (0.353487901, 0.3735252458, 8.277049286e-05, 0.9062562627,
-         0.09150803491, 0.9099517204, 596.3148142)
+_PU21 = (0.353487901, 0.3734658629, 8.277049286e-05, 0.9062562627,
+         0.09150303166, 0.9099517204, 596.3148142)
 _YMIN = 0.005
 
 
@@ -67,9 +67,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split_dir", required=True)
     ap.add_argument("--condition", required=True)
-    ap.add_argument("--arms", required=True, help="comma list, e.g. pct3lin_scale,pct3notanh_scale")
+    ap.add_argument("--arms", required=True, help="comma-separated; each is read from <pred_root>/<arm>/pred")
     ap.add_argument("--file_list", default="SIHDR_test.txt")
-    ap.add_argument("--out_dir", default="fid_logs/piqe_ref")
+    ap.add_argument("--out_dir", default="piqe")
     ap.add_argument("--check", default="", help="arm=expected, aborts unless it reproduces")
     ap.add_argument("--pred_root", default=None,
                     help="directory holding <arm>/pred (default: --split_dir)")

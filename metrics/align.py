@@ -129,7 +129,7 @@ def fit_align(pred, gt, guidance, mode):
     if mode == "guidance_scale":
         r = guidance[m]
         s = float((p * r).sum() / max((p * p).sum(), 1e-12))
-        return pred * s, {"scale": s, "oracle_free": True}
+        return pred * s, {"scale": s}
     if mode == "scale":
         s = float((p * g).sum() / max((p * p).sum(), 1e-12))
         return pred * s, {"scale": s}
@@ -150,9 +150,10 @@ def fit_align(pred, gt, guidance, mode):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw_dir", required=True,
-                    help="LEDiff .npy output, or a dir of our *.tiff")
+                    help="predictions, one file per image: <name>_generated_linear.tiff, "
+                         "or <name>.npy/.tiff/.exr/.hdr")
     ap.add_argument("--split_dir", required=True,
-                    help="the 512 pseudo-split with GT and guidance")
+                    help="the split the predictions were made from (targets and guidance)")
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--align", default="scale",
                     choices=["none", "scale", "gamma_scale", "guidance_scale"],

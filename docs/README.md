@@ -10,17 +10,6 @@ dependencies: GitHub Pages serves `index.html` as-is.
     assets/      teaser images (512x512 PNG)
     .nojekyll    serve the files verbatim, without Jekyll processing
 
-## Filling in the links
-
-The arXiv and Paper buttons start disabled (Supplementary, Code and Checkpoints are live). Each is marked with a
-`PLACEHOLDER` comment in `index.html`. To activate one, set its `href` and
-remove `disabled` from its `class`:
-
-| button | href to use |
-|---|---|
-| arXiv | `https://arxiv.org/abs/XXXX.XXXXX` |
-| Paper | `paper.pdf`, uploaded next to `index.html` |
-
 ## Local preview
 
     python3 -m http.server 8000

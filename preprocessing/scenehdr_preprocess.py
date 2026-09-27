@@ -230,8 +230,7 @@ def main():
                          "perspective views, as LEDiff does for its panorama "
                          "sources")
     ap.add_argument("--views_per_image", type=int, default=5,
-                    help="LEDiff's 36k images over ~5.4k panoramas plus ~10k "
-                         "regular images implies roughly this many")
+                    help="random perspective views per panorama")
     ap.add_argument("--size", type=int, nargs=2, default=[512, 512],
                     metavar=("H", "W"))
     ap.add_argument("--fov", type=float, nargs=2, default=[55.0, 95.0],
@@ -257,18 +256,11 @@ def main():
     ap.add_argument("--capture_model", default="none",
                     choices=["none", "lediff"],
                     help="applies to --degradation stops/percentile only "
-                         "('lediff' already has it built in). 'none' = our "
-                         "HDR+ behaviour: the clipped linear guidance is stored "
-                         "as-is, no response curve and no quantisation. "
-                         "'lediff' additionally pushes it through the "
-                         "randomised CRF of their eq. (1) and an 8-bit round "
-                         "trip, then linearises back with the sRGB inverse -- "
-                         "which is what happens at test time, since SI-HDR's "
-                         "inputs are 8-bit PNGs made with a custom CRF and we "
-                         "invert sRGB not knowing their curve. Training "
-                         "through the same gap is the point. Does NOT model "
-                         "sensor noise; SI-HDR's inputs also carry Canon 5D3 "
-                         "noise, which remains an unmodelled axis.")
+                         "('lediff' already has it built in). 'none' stores "
+                         "the clipped linear guidance as-is. 'lediff' passes it "
+                         "through a randomised camera response and an 8-bit "
+                         "round trip, then linearises it with the inverse sRGB "
+                         "curve (the ExpandDiff-B split).")
     ap.add_argument("--clip_pct_high", type=float, nargs=2, default=[0.0, 30.0],
                     help="--degradation percentile only: percent of pixels to "
                          "BLOW, sampled U[lo, hi] per image. 0 = untouched.")
@@ -298,15 +290,9 @@ def main():
                     help="stops of uniform jitter added to each capture "
                          "exposure, U(-j, +j). 0.0 = off.")
     ap.add_argument("--exposures", default="e0", choices=["e0", "all"],
-                    help="'e0' uses only the middle exposure, which is what a "
-                         "normal photo looks like and what arrives at "
-                         "deployment. 'all' additionally emits E- and E+ as "
-                         "separate pairs against the SAME target: LEDiff needs "
-                         "the three because its method IS bracket generation, "
-                         "but for us each is just a valid (LDR, HDR) pair at a "
-                         "different difficulty -- E- near-unclipped, E+ with "
-                         "~50%% of pixels blown. Free 3x augmentation that "
-                         "spreads difficulty the way our stop sweeps do.")
+                    help="'e0' uses only the middle exposure. 'all' also "
+                         "emits E- and E+ as separate pairs against the same "
+                         "target (the ExpandDiff-S split).")
     ap.add_argument("--split", default="train", choices=["train", "test"])
     ap.add_argument("--prefix", default="SceneHDR")
     ap.add_argument("--append", action="store_true",

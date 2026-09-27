@@ -27,7 +27,7 @@ sys.path.insert(0, ROOT)          # so `rawdiffusion` imports from the repo root
 from rawdiffusion.utils import pu21_encode_metric   # noqa: E402
 import torch                                        # noqa: E402
 
-PU21_M = os.environ.get("PU21_M", os.path.join(ROOT, "tools", "pu21_matlab"))
+PU21_M = os.environ.get("PU21_M", "")
 # Octave: $OCT_BIN, else whatever is on PATH. Some builds (conda-forge
 # among them) also need $OCTAVE_HOME; when it is not already set we derive
 # it from the binary, which is correct for a prefix install.
@@ -73,16 +73,15 @@ def main():
     ap.add_argument("--condition", required=True)
     ap.add_argument("--arms", required=True)
     ap.add_argument("--file_list", default="SIHDR_test.txt")
-    ap.add_argument("--out_dir", default="fid_logs/vsi_ref")
+    ap.add_argument("--out_dir", default="vsi")
     ap.add_argument("--l_peak", type=float, default=1000.0)
     ap.add_argument("--pred_root", default=None,
                     help="directory holding <arm>/pred (default: --split_dir)")
     a = ap.parse_args()
 
     if not os.path.isfile(os.path.join(PU21_M, "m_vsi.m")):
-        raise SystemExit(f"[error] m_vsi.m not found under PU21_M={PU21_M}")
-    correct = None
-
+        raise SystemExit("[error] set $PU21_M to a folder holding gfxdisp/pu21's "
+                         f"m_vsi.m (now: {PU21_M or 'unset'})")
     pairs = read_pairs(a.split_dir, a.file_list)
     os.makedirs(a.out_dir, exist_ok=True)
     tag = "vsiref"
@@ -108,8 +107,6 @@ def main():
             if pred.shape[:2] != gt.shape[:2]:
                 miss += 1
                 continue
-            if correct is not None:
-                pred = correct(pred, gt)[0]
             P = pu21_encode_metric(torch.from_numpy(np.ascontiguousarray(pred)).clamp(0, 1),
                                    a.l_peak).numpy().astype(np.float64)
             T = pu21_encode_metric(torch.from_numpy(np.ascontiguousarray(gt)).clamp(0, 1),
